@@ -1,0 +1,48 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/ai/scan-receipt'
+order: 2000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{authToken}}'
+body:
+  type: formdata
+  content:
+    - key: receipt
+      type: file
+      src: ''
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const res = pm.response.json();
+
+      pm.test('Status code is 200', function () {
+        pm.response.to.have.status(200);
+      });
+
+      pm.test('Response has extractedData field', function () {
+        pm.expect(res).to.have.property('extractedData');
+      });
+
+      pm.test('extractedData has storeName', function () {
+        pm.expect(res.extractedData).to.have.property('storeName');
+      });
+
+      pm.test('extractedData has amount', function () {
+        pm.expect(res.extractedData).to.have.property('amount');
+      });
+
+      pm.test('extractedData has category', function () {
+        pm.expect(res.extractedData).to.have.property('category');
+      });
+
+      pm.test('extractedData has sustainabilityScore', function () {
+        pm.expect(res.extractedData).to.have.property('sustainabilityScore');
+      });
+
+      pm.test('extractedData has sustainabilityTip', function () {
+        pm.expect(res.extractedData).to.have.property('sustainabilityTip');
+      });

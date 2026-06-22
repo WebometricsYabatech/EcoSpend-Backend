@@ -29,6 +29,7 @@ model Expense {
   user                User     @relation(fields: [userId], references: [id])
   amount              Float
   category            String
+  storeName           String?
   description         String?
   sustainabilityScore Int?
   receiptUrl          String?
