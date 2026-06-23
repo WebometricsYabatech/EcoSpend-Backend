@@ -1,8 +1,12 @@
 import multer from 'multer'
-import path from 'path'
 import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
-const uploadDir = 'uploads/receipts'
+// Resolve uploads directory relative to this file, not the process CWD.
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const uploadDir = path.resolve(__dirname, '../../uploads/receipts')
 
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true })
