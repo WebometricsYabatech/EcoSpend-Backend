@@ -6,11 +6,14 @@ import { fileURLToPath } from 'url'
 // Resolve uploads directory relative to this file, not the process CWD.
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const uploadDir = path.resolve(__dirname, '../../uploads/receipts')
+const uploadDir = process.env.UPLOADS_DIR
+  ? path.resolve(process.env.UPLOADS_DIR, 'receipts')
+  : path.resolve(__dirname, '../../uploads/receipts')
 
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true })
-}
+// Ensure parent directories exist. In some deployments, the computed path may not be creatable;
+// allow override via UPLOADS_DIR (e.g., /tmp/uploads).
+fs.mkdirSync(uploadDir, { recursive: true })
+
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
