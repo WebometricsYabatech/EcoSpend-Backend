@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const uploadDir = process.env.UPLOADS_DIR
   ? path.resolve(process.env.UPLOADS_DIR, 'receipts')
-  : path.resolve(__dirname, '../../uploads/receipts')
+  : path.resolve('/tmp/uploads/receipts')
 
 // Ensure parent directories exist. In some deployments, the computed path may not be creatable;
 // allow override via UPLOADS_DIR (e.g., /tmp/uploads).
