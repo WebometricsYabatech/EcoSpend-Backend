@@ -1,7 +1,8 @@
 {
-  "name": "spendwise-backend",
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "Ecospend-backend",
   "version": "1.0.0",
-  "description": "Spendwise Backend API",
+  "description": "Ecospend Backend API",
   "main": "server.js",
   "type": "module",
   "scripts": {
