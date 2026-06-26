@@ -11,15 +11,10 @@ dotenv.config()
 
 const app = express()
 
-const CORS_ORIGIN = process.env.CORS_ORIGIN || ''
-const isWildcard = CORS_ORIGIN.trim() === '*' || CORS_ORIGIN.trim().toLowerCase() === 'any'
-
-const allowedOrigins = isWildcard
-  ? []
-  : (CORS_ORIGIN || 'http://localhost:5173')
-      .split(',')
-      .map((origin) => origin.trim())
-      .filter(Boolean)
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5174')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean)
 
 const corsOptions = {
   origin(origin, callback) {
@@ -61,7 +56,7 @@ const uploadsDir = process.env.UPLOADS_DIR
 app.use('/uploads', express.static(uploadsDir))
 
 app.get('/', (req, res) => {
-  res.send('Spendwise API is running')
+  res.send('Ecospend API is running')
 })
 
 app.use((req, res) => {
