@@ -15,6 +15,7 @@ const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5174')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean)
+  const iswildcard = allowedOrigins.includes("*")
 
 const corsOptions = {
   origin(origin, callback) {
