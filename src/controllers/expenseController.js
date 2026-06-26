@@ -1,5 +1,5 @@
-import { PrismaClient } from '@prisma/client'
-const prisma = new PrismaClient()
+import prisma from '../lib/prisma.js'
+
 
 // CREATE - Add expense (manual or from AI scan)
 export const addExpense = async (req, res) => {

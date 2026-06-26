@@ -15,6 +15,12 @@ const fileToGenerativePart = (filePath, mimeType) => {
 
 export const scanReceipt = async (req, res) => {
   try {
+    if (!process.env.GEMINI_API_KEY) {
+      return res
+        .status(500)
+        .json({ message: 'Server misconfiguration: GEMINI_API_KEY is missing' })
+    }
+
     if (!req.file) {
       return res.status(400).json({ message: 'No receipt image uploaded' })
     }

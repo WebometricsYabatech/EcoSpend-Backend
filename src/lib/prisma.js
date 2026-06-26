@@ -1,7 +1,9 @@
 import { PrismaClient } from '@prisma/client'
 
-const prisma = new PrismaClient({
-  databaseUrl: process.env.DATABASE_URL  // ✅ Prisma 7 property name
-})
+// Use env DATABASE_URL implicitly.
+// NOTE: Do not pass unsupported PrismaClient constructor options.
+const prisma = new PrismaClient()
 
 export default prisma
+
+
