@@ -2,7 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import path from 'path'
-import { fileURLToPath } from 'url'
+// import { fileURLToPath } from 'url'
 import expenseRoutes from './routes/expenses.js'
 import authRoutes from './routes/auth.js'
 import aiRoutes from './routes/ai.js'
@@ -15,7 +15,7 @@ const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5174')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean)
-  const iswildcard = allowedOrigins.includes("*")
+  const isWildcard = allowedOrigins.includes("*")
 
 const corsOptions = {
   origin(origin, callback) {
@@ -45,8 +45,8 @@ app.use('/api/expenses', expenseRoutes)
 app.use('/api/ai', aiRoutes)
 
 // Uploads: serve the same absolute directory multer writes to
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+// const __filename = fileURLToPath(import.meta.url)
+// const __dirname = path.dirname(__filename)
 
 // Keep logic in sync with src/middleware/upload.js
 const uploadsDir = process.env.UPLOADS_DIR
