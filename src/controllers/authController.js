@@ -61,3 +61,36 @@ export const login = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message })
   }
 }
+
+// ================= LOGOUT =================
+// JWT logout is typically client-side (delete token).
+// This backend currently does not store refresh tokens, so we just return success.
+export const logout = async (req, res) => {
+  try {
+    return res.status(200).json({ message: 'Logout successful' })
+  } catch (error) {
+    console.error('LOGOUT ERROR:', error)
+    return res.status(500).json({ message: 'Server Error', error: error.message })
+  }
+}
+
+
+// ================= DELETE ACCOUNT =================
+export const deleteAccount = async (req, res) => {
+  try {
+    // Delete all user expenses first (foreign key constraint)
+    await prisma.expense.deleteMany({
+      where: { userId: req.user.id }
+    })
+
+    // Then delete the user
+    await prisma.user.delete({
+      where: { id: req.user.id }
+    })
+
+    return res.status(200).json({ message: 'Account deleted successfully' })
+  } catch (error) {
+    console.error('DELETE ACCOUNT ERROR:', error)
+    return res.status(500).json({ message: 'Server Error', error: error.message })
+  }
+}

@@ -6,6 +6,8 @@ import path from 'path'
 import expenseRoutes from './routes/expenses.js'
 import authRoutes from './routes/auth.js'
 import aiRoutes from './routes/ai.js'
+import receiptRoutes from './routes/receipts.js'
+import budgetRoutes from './routes/budget.js'
 
 dotenv.config()
 
@@ -43,6 +45,8 @@ app.use(express.urlencoded({ extended: true }))
 app.use('/api/auth', authRoutes)
 app.use('/api/expenses', expenseRoutes)
 app.use('/api/ai', aiRoutes)
+app.use('/api/receipts', receiptRoutes)
+app.use('/api/budget',budgetRoutes)
 
 // Uploads: serve the same absolute directory multer writes to
 // const __filename = fileURLToPath(import.meta.url)
