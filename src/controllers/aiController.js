@@ -1,36 +1,28 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import OpenAI from 'openai'
 import prisma from '../lib/prisma.js'
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 // ================= SCAN RECEIPT =================
 export const scanReceipt = async (req, res) => {
   try {
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({ 
-        message: 'Server misconfiguration: GEMINI_API_KEY is missing' 
-      })
-    }
-
     if (!req.file) {
       return res.status(400).json({ message: 'No receipt image uploaded' })
     }
 
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+    const base64Image = req.file.buffer.toString('base64')
+    const mimeType = req.file.mimetype
 
-    // Use buffer directly from memory storage — no file path needed
-    const imagePart = {
-      inlineData: {
-        data: req.file.buffer.toString('base64'),
-        mimeType: req.file.mimetype
-      }
-    }
-
-    const prompt = `
-You are a receipt scanning assistant for a sustainable spending tracker app.
-Analyze this receipt image and extract the following information.
-Respond ONLY with valid JSON in this exact format, no extra text, no markdown:
-
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `You are a receipt scanner. Look at this receipt image and extract only the purchased items and their prices.
+Return ONLY valid JSON, no extra text, no markdown:
 {
   "items": [
     {
@@ -43,17 +35,22 @@ Respond ONLY with valid JSON in this exact format, no extra text, no markdown:
   "sustainabilityScore": 0,
   "sustainabilityTip": "one short sentence tip for more sustainable choices"
 }
+sustainabilityScore is a number from 1 to 10 (10 = very sustainable).
+If you cannot read an item clearly, include your best guess anyway.`
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mimeType};base64,${base64Image}`
+              }
+            }
+          ]
+        }
+      ],
+      max_tokens: 1000
+    })
 
-Rules:
-- sustainabilityScore is a number from 1 to 10 (10 = very sustainable)
-- If you cannot read an item clearly, include your best guess anyway
-- totalAmount should be the sum of all item prices
-`
-
-    const result = await model.generateContent([prompt, imagePart])
-    const responseText = result.response.text()
-
-    // Strip markdown fences if Gemini wraps response
+    const responseText = response.choices[0].message.content
     const cleanedText = responseText.replace(/```json|```/g, '').trim()
     const extractedData = JSON.parse(cleanedText)
 
@@ -64,9 +61,9 @@ Rules:
 
   } catch (error) {
     console.error('SCAN RECEIPT ERROR:', error)
-    return res.status(500).json({ 
-      message: 'Failed to scan receipt', 
-      error: error.message 
+    return res.status(500).json({
+      message: 'Failed to scan receipt',
+      error: error.message
     })
   }
 }
@@ -80,7 +77,6 @@ export const confirmReceipt = async (req, res) => {
       return res.status(400).json({ message: 'No items provided' })
     }
 
-    // Save each item as a separate expense
     const expenses = await Promise.all(
       items.map(item =>
         prisma.expense.create({
@@ -97,7 +93,6 @@ export const confirmReceipt = async (req, res) => {
       )
     )
 
-    // Check if total spending exceeds budget
     const user = await prisma.user.findUnique({
       where: { id: req.user.id }
     })
@@ -126,9 +121,9 @@ export const confirmReceipt = async (req, res) => {
 
   } catch (error) {
     console.error('CONFIRM RECEIPT ERROR:', error)
-    return res.status(500).json({ 
-      message: 'Failed to save receipt', 
-      error: error.message 
+    return res.status(500).json({
+      message: 'Failed to save receipt',
+      error: error.message
     })
   }
 }
