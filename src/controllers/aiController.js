@@ -1,7 +1,7 @@
-import OpenAI from 'openai'
+import Groq from 'groq-sdk'
 import prisma from '../lib/prisma.js'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
 // ================= SCAN RECEIPT =================
 export const scanReceipt = async (req, res) => {
@@ -13,12 +13,18 @@ export const scanReceipt = async (req, res) => {
     const base64Image = req.file.buffer.toString('base64')
     const mimeType = req.file.mimetype
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const response = await groq.chat.completions.create({
+      model: 'llama-3.2-11b-vision-preview',
       messages: [
         {
           role: 'user',
           content: [
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mimeType};base64,${base64Image}`
+              }
+            },
             {
               type: 'text',
               text: `You are a receipt scanner. Look at this receipt image and extract only the purchased items and their prices.
@@ -37,12 +43,6 @@ Return ONLY valid JSON, no extra text, no markdown:
 }
 sustainabilityScore is a number from 1 to 10 (10 = very sustainable).
 If you cannot read an item clearly, include your best guess anyway.`
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:${mimeType};base64,${base64Image}`
-              }
             }
           ]
         }
