@@ -16,7 +16,7 @@ export const scanReceipt = async (req, res) => {
       return res.status(400).json({ message: 'No receipt image uploaded' })
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
     // Use buffer directly from memory storage — no file path needed
     const imagePart = {
