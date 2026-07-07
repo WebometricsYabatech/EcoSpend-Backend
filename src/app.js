@@ -1,8 +1,8 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
-import path from 'path'
-// import { fileURLToPath } from 'url'
+// import path from 'path' // not needed since we removed disk storage
+
 import expenseRoutes from './routes/expenses.js'
 import authRoutes from './routes/auth.js'
 import aiRoutes from './routes/ai.js'
@@ -13,30 +13,12 @@ dotenv.config()
 
 const app = express()
 
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5174')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean)
-  const isWildcard = allowedOrigins.includes("*")
-
-const corsOptions = {
-  origin(origin, callback) {
-    if (!origin) return callback(null, true) // non-browser clients
-    if (isWildcard) return callback(null, true)
-    if (allowedOrigins.includes(origin)) return callback(null, true)
-    return callback(null, false)
-  },
+// ✅ Open CORS — allows all origins (safe for now, tighten after demo)
+app.use(cors({
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  optionsSuccessStatus: 204,
-}
-
-app.use(cors(corsOptions))
-app.use((req, res, next) => {
-  if (req.method === 'OPTIONS') return res.sendStatus(204)
-  return next()
-})
+}))
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
@@ -46,19 +28,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/expenses', expenseRoutes)
 app.use('/api/ai', aiRoutes)
 app.use('/api/receipts', receiptRoutes)
-app.use('/api/budget',budgetRoutes)
-
-// Uploads: serve the same absolute directory multer writes to
-// const __filename = fileURLToPath(import.meta.url)
-// const __dirname = path.dirname(__filename)
-
-// Keep logic in sync with src/middleware/upload.js
-const uploadsDir = process.env.UPLOADS_DIR
-  ? path.resolve(process.env.UPLOADS_DIR, 'receipts')
-  : path.resolve('/tmp/uploads/receipts')
-
-
-app.use('/uploads', express.static(uploadsDir))
+app.use('/api/budget', budgetRoutes)
 
 app.get('/', (req, res) => {
   res.send('Ecospend API is running')
@@ -82,4 +52,3 @@ app.use((err, req, res, next) => {
 })
 
 export default app
-
