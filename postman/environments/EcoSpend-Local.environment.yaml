@@ -2,13 +2,9 @@ name: EcoSpend Local
 values:
   - key: baseUrl
     value: 'http://localhost:5000'
-    enabled: true
   - key: authToken
     value: ''
-    enabled: true
   - key: userEmail
-    value: 'test@example.com'
-    enabled: true
+    value: test@example.com
   - key: userPassword
-    value: 'password123'
-    enabled: true
+    value: password123

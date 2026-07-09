@@ -15,9 +15,10 @@ const app = express()
 
 // ✅ Open CORS — allows all origins (safe for now, tighten after demo)
 app.use(cors({
-  origin: '*',
+  origin: 'https://eco-spend-frontend.vercel.app',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }))
 
 app.use(express.json())
