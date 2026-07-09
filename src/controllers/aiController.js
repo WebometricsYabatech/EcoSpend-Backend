@@ -1,7 +1,7 @@
-import Groq from 'groq-sdk'
+import * as mindee from 'mindee'
 import prisma from '../lib/prisma.js'
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+const mindeeClient = new mindee.Client({ apiKey: process.env.MINDEE_API_KEY })
 
 // ================= SCAN RECEIPT =================
 export const scanReceipt = async (req, res) => {
@@ -10,49 +10,56 @@ export const scanReceipt = async (req, res) => {
       return res.status(400).json({ message: 'No receipt image uploaded' })
     }
 
-    const base64Image = req.file.buffer.toString('base64')
-    const mimeType = req.file.mimetype
+    // Create input from buffer
+    const inputSource = mindeeClient.docFromBuffer(
+      req.file.buffer,
+      req.file.originalname
+    )
 
-    const response = await groq.chat.completions.create({
-      model: 'llama-3.2-11b-vision-preview',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:${mimeType};base64,${base64Image}`
-              }
-            },
-            {
-              type: 'text',
-              text: `You are a receipt scanner. Look at this receipt image and extract only the purchased items and their prices.
-Return ONLY valid JSON, no extra text, no markdown:
-{
-  "items": [
-    {
-      "name": "item name",
-      "price": 0.00
+    // Parse the receipt
+    const apiResponse = await mindeeClient.parse(
+      mindee.product.ReceiptV5,
+      inputSource
+    )
+
+    const receipt = apiResponse.document.inference.prediction
+
+    // Extract line items and prices
+    const items = receipt.lineItems.map(item => ({
+      name: item.description || 'Unknown item',
+      price: item.totalAmount || item.unitPrice || 0
+    }))
+
+    // If no line items detected, fall back to total only
+    if (items.length === 0) {
+      items.push({
+        name: 'Total purchase',
+        price: receipt.totalAmount?.value || 0
+      })
     }
-  ],
-  "category": "one of: Groceries, Food & Dining, Transport, Utilities, Clothing, Electronics, Health, Entertainment, Other",
-  "totalAmount": 0.00,
-  "sustainabilityScore": 0,
-  "sustainabilityTip": "one short sentence tip for more sustainable choices"
-}
-sustainabilityScore is a number from 1 to 10 (10 = very sustainable).
-If you cannot read an item clearly, include your best guess anyway.`
-            }
-          ]
-        }
-      ],
-      max_tokens: 1000
-    })
 
-    const responseText = response.choices[0].message.content
-    const cleanedText = responseText.replace(/```json|```/g, '').trim()
-    const extractedData = JSON.parse(cleanedText)
+    // Map Mindee category to your app categories
+    const categoryMap = {
+      food: 'Food & Dining',
+      groceries: 'Groceries',
+      transport: 'Transport',
+      utilities: 'Utilities',
+      clothing: 'Clothing',
+      electronics: 'Electronics',
+      health: 'Health',
+      entertainment: 'Entertainment'
+    }
+
+    const rawCategory = receipt.category?.value?.toLowerCase() || ''
+    const category = categoryMap[rawCategory] || 'Other'
+
+    const extractedData = {
+      items,
+      category,
+      totalAmount: receipt.totalAmount?.value || 0,
+      sustainabilityScore: 5, // default neutral score
+      sustainabilityTip: 'Consider buying local and seasonal products to reduce your carbon footprint.'
+    }
 
     return res.status(200).json({
       message: 'Receipt scanned successfully',
