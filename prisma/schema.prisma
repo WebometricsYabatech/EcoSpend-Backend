@@ -16,13 +16,15 @@ datasource db {
 }
 
 model User {
-  id        String    @id @default(uuid())
-  fullname      String
-  email     String    @unique
-  password  String
-  budget    Float?
-  expenses  Expense[]
-  createdAt DateTime  @default(now())
+  id         String     @id @default(uuid())
+  fullname   String
+  email      String     @unique
+  password   String
+  token      String?
+  budget     Float?
+  expenses   Expense[]
+  categories Category[]
+  createdAt  DateTime   @default(now())
 }
 
 model Expense {
@@ -38,4 +40,12 @@ model Expense {
   isManual            Boolean  @default(false)
   date                DateTime @default(now())
   createdAt           DateTime @default(now())
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
 }
