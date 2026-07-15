@@ -17,6 +17,7 @@ model User {
   token     String?
   avatarUrl String?
   expenses  Expense[]
+  categories Category[]
   createdAt DateTime  @default(now())
 }
 
@@ -33,4 +34,14 @@ model Expense {
   date                DateTime @default(now())
   createdAt           DateTime @default(now())
   user                User     @relation(fields: [userId], references: [id])
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String
+  userId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }

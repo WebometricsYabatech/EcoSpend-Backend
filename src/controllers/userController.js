@@ -1,8 +1,5 @@
-import { PrismaClient } from '@prisma/client'
+import prisma from '../lib/prisma.js'
 import cloudinary from '../middleware/cloudinary.js'
-import fs from 'fs'
-
-const prisma = new PrismaClient()
 
 // GET profile
 export const getProfile = async (req, res) => {
@@ -11,7 +8,7 @@ export const getProfile = async (req, res) => {
       where: { id: req.user.id },
       select: {
         id: true,
-        name: true,
+        fullname: true,
         email: true,
         budget: true,
         avatarUrl: true,
@@ -29,20 +26,20 @@ export const getProfile = async (req, res) => {
   }
 }
 
-// UPDATE profile (name and/or budget)
+// UPDATE profile (fullname and/or budget)
 export const updateProfile = async (req, res) => {
-  const { name, budget } = req.body
+  const { fullname, budget } = req.body
 
   try {
     const user = await prisma.user.update({
       where: { id: req.user.id },
       data: {
-        name: name ?? undefined,
+        fullname: fullname ?? undefined,
         budget: budget ? parseFloat(budget) : undefined
       },
       select: {
         id: true,
-        name: true,
+        fullname: true,
         email: true,
         budget: true,
         avatarUrl: true,
@@ -63,16 +60,16 @@ export const uploadAvatar = async (req, res) => {
       return res.status(400).json({ message: 'No image uploaded' })
     }
 
+    // Build a data URI from the in-memory buffer (multer uses memoryStorage)
+    const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`
+
     // Upload to Cloudinary
-    const result = await cloudinary.uploader.upload(req.file.path, {
+    const result = await cloudinary.uploader.upload(dataUri, {
       folder: 'spendwise/avatars',
       transformation: [
         { width: 300, height: 300, crop: 'fill', gravity: 'face' }
       ]
     })
-
-    // Delete temp file after upload
-    fs.unlinkSync(req.file.path)
 
     // Save Cloudinary URL to database
     const user = await prisma.user.update({
@@ -80,7 +77,7 @@ export const uploadAvatar = async (req, res) => {
       data: { avatarUrl: result.secure_url },
       select: {
         id: true,
-        name: true,
+        fullname: true,
         email: true,
         avatarUrl: true
       }
