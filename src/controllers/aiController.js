@@ -10,35 +10,34 @@ export const scanReceipt = async (req, res) => {
       return res.status(400).json({ message: 'No receipt image uploaded' })
     }
 
-    // Create input from buffer
+    // Correct method for Mindee v5
     const inputSource = mindeeClient.docFromBuffer(
       req.file.buffer,
       req.file.originalname
     )
 
-    // Parse the receipt
-    const apiResponse = await mindeeClient.parse(
+    // Mindee v5 uses enqueueAndParse for async polling
+    const apiResponse = await mindeeClient.enqueueAndParse(
       mindee.product.ReceiptV5,
       inputSource
     )
 
     const receipt = apiResponse.document.inference.prediction
 
-    // Extract line items and prices
-    const items = receipt.lineItems.map(item => ({
+    // Extract line items
+    const items = receipt.lineItems?.map(item => ({
       name: item.description || 'Unknown item',
       price: item.totalAmount || item.unitPrice || 0
-    }))
+    })) || []
 
-    // If no line items detected, fall back to total only
     if (items.length === 0) {
       items.push({
         name: 'Total purchase',
-        price: receipt.totalAmount?.value || 0
+        price: receipt.totalNet?.value || receipt.totalAmount?.value || 0
       })
     }
 
-    // Map Mindee category to your app categories
+    // Category mapping
     const categoryMap = {
       food: 'Food & Dining',
       groceries: 'Groceries',
@@ -54,10 +53,12 @@ export const scanReceipt = async (req, res) => {
     const category = categoryMap[rawCategory] || 'Other'
 
     const extractedData = {
+      storeName: receipt.supplierName?.value || 'Unknown store',
+      date: receipt.date?.value || new Date().toISOString().split('T')[0],
       items,
       category,
       totalAmount: receipt.totalAmount?.value || 0,
-      sustainabilityScore: 5, // default neutral score
+      sustainabilityScore: 5,
       sustainabilityTip: 'Consider buying local and seasonal products to reduce your carbon footprint.'
     }
 
