@@ -1,0 +1,30 @@
+$kind: http-request
+name: user/avatar
+method: POST
+url: '{{baseUrl}}/api/user/avatar'
+order: 1000
+auth:
+  type: bearer
+  bearer:
+    - key: token
+      value: '{{authToken}}'
+body:
+  type: formdata
+  formdata:
+    - key: avatar
+      value: ''
+      type: file
+      description: 'Image file to upload (jpg, png, etc.)'
+scripts:
+  - type: afterResponse
+    code: |-
+      const res = pm.response.json();
+
+      pm.test('Status code is 200', function () {
+        pm.response.to.have.status(200);
+      });
+
+      pm.test('Response has avatarUrl', function () {
+        pm.expect(res).to.have.property('avatarUrl');
+      });
+    language: text/javascript
