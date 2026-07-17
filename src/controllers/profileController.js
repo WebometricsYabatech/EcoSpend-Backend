@@ -67,21 +67,18 @@ export const updateProfile = async (req, res) => {
 // CHANGE PASSWORD
 export const changePassword = async (req, res) => {
   try {
-    const { currentPassword, newPassword } = req.body
+    const { newPassword, confirmPassword } = req.body
 
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: 'Both current and new password are required' })
+    if (!newPassword || !confirmPassword) {
+      return res.status(400).json({ message: 'All password fields are required' })
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ message: 'Passwords do not match' })
     }
 
     if (newPassword.length < 6) {
-      return res.status(400).json({ message: 'New password must be at least 6 characters' })
-    }
-
-    const user = await prisma.user.findUnique({ where: { id: req.user.id } })
-
-    const isMatch = await bcrypt.compare(currentPassword, user.password)
-    if (!isMatch) {
-      return res.status(401).json({ message: 'Current password is incorrect' })
+      return res.status(400).json({ message: 'Password must be at least 6 characters' })
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10)

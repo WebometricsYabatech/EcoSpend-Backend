@@ -1,7 +1,7 @@
-import * as mindee from 'mindee'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import prisma from '../lib/prisma.js'
 
-const mindeeClient = new mindee.Client({ apiKey: process.env.MINDEE_API_KEY })
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
 
 // ================= SCAN RECEIPT =================
 export const scanReceipt = async (req, res) => {
@@ -10,57 +10,37 @@ export const scanReceipt = async (req, res) => {
       return res.status(400).json({ message: 'No receipt image uploaded' })
     }
 
-    // Correct method for Mindee v5
-    const inputSource = mindeeClient.docFromBuffer(
-      req.file.buffer,
-      req.file.originalname
-    )
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
-    // Mindee v5 uses enqueueAndParse for async polling
-    const apiResponse = await mindeeClient.enqueueAndParse(
-      mindee.product.ReceiptV5,
-      inputSource
-    )
-
-    const receipt = apiResponse.document.inference.prediction
-
-    // Extract line items
-    const items = receipt.lineItems?.map(item => ({
-      name: item.description || 'Unknown item',
-      price: item.totalAmount || item.unitPrice || 0
-    })) || []
-
-    if (items.length === 0) {
-      items.push({
-        name: 'Total purchase',
-        price: receipt.totalNet?.value || receipt.totalAmount?.value || 0
-      })
+    const imagePart = {
+      inlineData: {
+        data: req.file.buffer.toString('base64'),
+        mimeType: req.file.mimetype
+      }
     }
 
-    // Category mapping
-    const categoryMap = {
-      food: 'Food & Dining',
-      groceries: 'Groceries',
-      transport: 'Transport',
-      utilities: 'Utilities',
-      clothing: 'Clothing',
-      electronics: 'Electronics',
-      health: 'Health',
-      entertainment: 'Entertainment'
+    const prompt = `You are a receipt scanner for a sustainable spending tracker app.
+Analyze this receipt image and extract the purchased items and their prices.
+Return ONLY valid JSON, no extra text, no markdown backticks:
+{
+  "items": [
+    {
+      "name": "item name",
+      "price": 0.00
     }
+  ],
+  "category": "one of: Groceries, Food & Dining, Transport, Utilities, Clothing, Electronics, Health, Entertainment, Other",
+  "totalAmount": 0.00,
+  "sustainabilityScore": 0,
+  "sustainabilityTip": "one short sentence tip for more sustainable choices"
+}
+sustainabilityScore is a number from 1 to 10 (10 = very sustainable).
+If you cannot read an item clearly, include your best guess anyway.`
 
-    const rawCategory = receipt.category?.value?.toLowerCase() || ''
-    const category = categoryMap[rawCategory] || 'Other'
-
-    const extractedData = {
-      storeName: receipt.supplierName?.value || 'Unknown store',
-      date: receipt.date?.value || new Date().toISOString().split('T')[0],
-      items,
-      category,
-      totalAmount: receipt.totalAmount?.value || 0,
-      sustainabilityScore: 5,
-      sustainabilityTip: 'Consider buying local and seasonal products to reduce your carbon footprint.'
-    }
+    const result = await model.generateContent([prompt, imagePart])
+    const responseText = result.response.text()
+    const cleanedText = responseText.replace(/```json|```/g, '').trim()
+    const extractedData = JSON.parse(cleanedText)
 
     return res.status(200).json({
       message: 'Receipt scanned successfully',
