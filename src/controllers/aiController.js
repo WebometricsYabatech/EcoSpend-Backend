@@ -1,7 +1,8 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import Tesseract from 'tesseract.js'
+import Groq from 'groq-sdk'
 import prisma from '../lib/prisma.js'
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
 // ================= SCAN RECEIPT =================
 export const scanReceipt = async (req, res) => {
@@ -10,19 +11,29 @@ export const scanReceipt = async (req, res) => {
       return res.status(400).json({ message: 'No receipt image uploaded' })
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' })
+    // Step 1: Extract raw text from image using Tesseract OCR
+    const { data: { text } } = await Tesseract.recognize(
+      req.file.buffer,
+      'eng',
+      { logger: () => {} } // suppress logs
+    )
 
-    const imagePart = {
-      inlineData: {
-        data: req.file.buffer.toString('base64'),
-        mimeType: req.file.mimetype
-      }
+    if (!text || text.trim().length === 0) {
+      return res.status(400).json({ message: 'Could not extract text from receipt image' })
     }
 
-    const prompt = `You are a receipt scanner for a sustainable spending tracker app.
-Analyze this receipt image and extract the purchased items and their prices.
-Return ONLY valid JSON, no extra text, no markdown backticks:
+    // Step 2: Send extracted text to Groq text model to structure it
+    const response = await groq.chat.completions.create({
+      model: 'openai/gpt-oss-20b',
+      messages: [
+        {
+          role: 'user',
+          content: `You are a receipt parser for a sustainable spending tracker app.
+Below is raw text extracted from a receipt image using OCR.
+Parse it and return ONLY valid JSON, no extra text, no markdown backticks:
 {
+  "storeName": "store name or Unknown if not visible",
+  "date": "YYYY-MM-DD or null if not visible",
   "items": [
     {
       "name": "item name",
@@ -35,10 +46,16 @@ Return ONLY valid JSON, no extra text, no markdown backticks:
   "sustainabilityTip": "one short sentence tip for more sustainable choices"
 }
 sustainabilityScore is a number from 1 to 10 (10 = very sustainable).
-If you cannot read an item clearly, include your best guess anyway.`
+If you cannot identify a price for an item, use 0.00.
 
-    const result = await model.generateContent([prompt, imagePart])
-    const responseText = result.response.text()
+Raw receipt text:
+${text}`
+        }
+      ],
+      max_tokens: 1000
+    })
+
+    const responseText = response.choices[0].message.content
     const cleanedText = responseText.replace(/```json|```/g, '').trim()
     const extractedData = JSON.parse(cleanedText)
 
