@@ -65,7 +65,7 @@ export const uploadAvatar = async (req, res) => {
 
     // Upload to Cloudinary
     const result = await cloudinary.uploader.upload(dataUri, {
-      folder: 'spendwise/avatars',
+      folder: 'ecospend/avatars',
       transformation: [
         { width: 300, height: 300, crop: 'fill', gravity: 'face' }
       ]
