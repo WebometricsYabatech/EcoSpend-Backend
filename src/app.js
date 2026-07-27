@@ -13,6 +13,7 @@ import categoryRoutes from './routes/categories.js'
 import profileRoutes from './routes/profile.js'
 import transactionRoutes from './routes/transactions.js'
 import userRoutes from './routes/user.js'
+import adminRoutes from './routes/admin.js'
 
 dotenv.config()
 
@@ -43,6 +44,7 @@ app.use('/api/categories', categoryRoutes)
 app.use('/api/profile', profileRoutes)
 app.use('/api/transactions', transactionRoutes)
 app.use('/api/user', userRoutes)
+app.use('/api/admin', adminRoutes)
 
 app.get('/', (req, res) => {
   res.send('Ecospend API is running')

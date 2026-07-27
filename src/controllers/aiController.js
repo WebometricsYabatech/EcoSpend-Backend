@@ -1,29 +1,40 @@
-import Tesseract from 'tesseract.js'
 import Groq from 'groq-sdk'
+import axios from 'axios'
+import FormData from 'form-data'
 import prisma from '../lib/prisma.js'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
-// ================= SCAN RECEIPT =================
 export const scanReceipt = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No receipt image uploaded' })
     }
 
-    // Step 1: Extract raw text from image using Tesseract OCR
-    const { data: { text } } = await Tesseract.recognize(
-      req.file.buffer,
-      'eng',
-      { logger: () => {} } // suppress logs
+    // Step 1 — Send image to OCR.space API
+    const formData = new FormData()
+    formData.append('file', req.file.buffer, {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype
+    })
+    formData.append('apikey', process.env.OCR_SPACE_API_KEY)
+    formData.append('language', 'eng')
+    formData.append('isOverlayRequired', 'false')
+
+    const ocrResponse = await axios.post(
+      'https://api.ocr.space/parse/image',
+      formData,
+      { headers: formData.getHeaders(), timeout: 20000 }
     )
 
-    if (!text || text.trim().length === 0) {
-      return res.status(400).json({ message: 'Could not extract text from receipt image' })
+    const parsedText = ocrResponse.data?.ParsedResults?.[0]?.ParsedText
+
+    if (!parsedText || parsedText.trim().length === 0) {
+      return res.status(400).json({ message: 'Could not extract text from receipt' })
     }
 
-    // Step 2: Send extracted text to Groq text model to structure it
-    const response = await groq.chat.completions.create({
+    // Step 2 — Send extracted text to Groq to structure as JSON
+    const groqResponse = await groq.chat.completions.create({
       model: 'openai/gpt-oss-20b',
       messages: [
         {
@@ -32,8 +43,6 @@ export const scanReceipt = async (req, res) => {
 Below is raw text extracted from a receipt image using OCR.
 Parse it and return ONLY valid JSON, no extra text, no markdown backticks:
 {
-  "storeName": "store name or Unknown if not visible",
-  "date": "YYYY-MM-DD or null if not visible",
   "items": [
     {
       "name": "item name",
@@ -45,17 +54,17 @@ Parse it and return ONLY valid JSON, no extra text, no markdown backticks:
   "sustainabilityScore": 0,
   "sustainabilityTip": "one short sentence tip for more sustainable choices"
 }
-sustainabilityScore is a number from 1 to 10 (10 = very sustainable).
-If you cannot identify a price for an item, use 0.00.
+sustainabilityScore is 1 to 10 (10 = very sustainable).
+If you cannot identify a price, use 0.00.
 
 Raw receipt text:
-${text}`
+${parsedText}`
         }
       ],
       max_tokens: 1000
     })
 
-    const responseText = response.choices[0].message.content
+    const responseText = groqResponse.choices[0].message.content
     const cleanedText = responseText.replace(/```json|```/g, '').trim()
     const extractedData = JSON.parse(cleanedText)
 
