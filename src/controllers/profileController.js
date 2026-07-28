@@ -67,14 +67,10 @@ export const updateProfile = async (req, res) => {
 // CHANGE PASSWORD
 export const changePassword = async (req, res) => {
   try {
-    const { newPassword, confirmPassword } = req.body
+    const { newPassword } = req.body
 
-    if (!newPassword || !confirmPassword) {
-      return res.status(400).json({ message: 'All password fields are required' })
-    }
-
-    if (newPassword !== confirmPassword) {
-      return res.status(400).json({ message: 'Passwords do not match' })
+    if (!newPassword) {
+      return res.status(400).json({ message: 'New password is required' })
     }
 
     if (newPassword.length < 6) {
@@ -89,6 +85,7 @@ export const changePassword = async (req, res) => {
     })
 
     return res.status(200).json({ message: 'Password changed successfully' })
+
   } catch (error) {
     console.error('CHANGE PASSWORD ERROR:', error)
     return res.status(500).json({ message: 'Server Error', error: error.message })
