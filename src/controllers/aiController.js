@@ -35,14 +35,16 @@ export const scanReceipt = async (req, res) => {
 
     // Step 2 — Send extracted text to Groq to structure as JSON
     const groqResponse = await groq.chat.completions.create({
-      model: 'openai/gpt-oss-20b',
-      messages: [
-        {
-          role: 'user',
-          content: `You are a receipt parser for a sustainable spending tracker app.
+  model: 'openai/gpt-oss-20b',
+  messages: [
+    {
+      role: 'user',
+      content: `You are a receipt parser for a sustainable spending tracker app.
 Below is raw text extracted from a receipt image using OCR.
 Parse it and return ONLY valid JSON, no extra text, no markdown backticks:
 {
+  "storeName": "name of the store or vendor, use Unknown if not visible",
+  "date": "date on the receipt in YYYY-MM-DD format, use today's date if not visible",
   "items": [
     {
       "name": "item name",
@@ -59,11 +61,10 @@ If you cannot identify a price, use 0.00.
 
 Raw receipt text:
 ${parsedText}`
-        }
-      ],
-      max_tokens: 1000
-    })
-
+    }
+  ],
+  max_tokens: 1000
+})
     const responseText = groqResponse.choices[0].message.content
     const cleanedText = responseText.replace(/```json|```/g, '').trim()
     const extractedData = JSON.parse(cleanedText)
