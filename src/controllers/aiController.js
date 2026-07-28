@@ -93,21 +93,22 @@ export const confirmReceipt = async (req, res) => {
     }
 
     const expenses = await Promise.all(
-      items.map(item =>
-        prisma.expense.create({
-          data: {
-            userId: req.user.id,
-            amount: parseFloat(item.price),
-            category: category || 'Other',
-            description: item.name,
-            sustainabilityScore: sustainabilityScore || null,
-            isManual: false,
-            date: new Date()
-          }
-        })
-      )
-    )
-
+  items.map(item =>
+    prisma.expense.create({
+      data: {
+        userId: req.user.id,
+        amount: parseFloat(item.price),
+        category: category || 'Food',        // changed 'Other' to 'Food' for receipts
+        description: item.name,
+        sustainabilityScore: sustainabilityScore || null,
+        storeName: req.body.store || null,   // ← add this
+        receiptUrl: req.body.receiptImage || null, // ← add this
+        isManual: false,
+        date: new Date()
+      }
+    })
+  )
+)
     const user = await prisma.user.findUnique({
       where: { id: req.user.id }
     })
