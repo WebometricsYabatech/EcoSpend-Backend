@@ -1,5 +1,75 @@
 import prisma from '../lib/prisma.js'
 
+// ================= GET RECEIPT HISTORY =================
+export const getReceiptHistory = async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { page = 1, limit = 10 } = req.query
+
+    // Get all scanned expenses ordered by createdAt
+    const allScannedExpenses = await prisma.expense.findMany({
+      where: { userId, isManual: false },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    // Group items into receipts by createdAt proximity (5 seconds = one receipt)
+    const receiptGroups = []
+    let currentGroup = []
+    let lastTime = null
+
+    for (const expense of allScannedExpenses) {
+      const currentTime = new Date(expense.createdAt).getTime()
+      if (!lastTime || lastTime - currentTime <= 5000) {
+        currentGroup.push(expense)
+      } else {
+        if (currentGroup.length > 0) receiptGroups.push(currentGroup)
+        currentGroup = [expense]
+      }
+      lastTime = currentTime
+    }
+    if (currentGroup.length > 0) receiptGroups.push(currentGroup)
+
+    // Format each receipt group
+    const receipts = receiptGroups.map((group, index) => ({
+      receiptId: `receipt-${group[0].createdAt.getTime()}`,
+      storeName: group[0].storeName || 'Unknown Store',
+      date: group[0].date,
+      scannedAt: group[0].createdAt,
+      category: group[0].category,
+      itemCount: group.length,
+      totalAmount: group.reduce((sum, e) => sum + e.amount, 0),
+      sustainabilityScore: group[0].sustainabilityScore || null,
+      items: group.map(e => ({
+        id: e.id,
+        name: e.description,
+        price: e.amount
+      }))
+    }))
+
+    // Pagination
+    const total = receipts.length
+    const skip = (parseInt(page) - 1) * parseInt(limit)
+    const paginated = receipts.slice(skip, skip + parseInt(limit))
+    const totalPages = Math.ceil(total / parseInt(limit))
+
+    return res.status(200).json({
+      receipts: paginated,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages,
+        hasNextPage: parseInt(page) < totalPages,
+        hasPrevPage: parseInt(page) > 1
+      }
+    })
+
+  } catch (error) {
+    console.error('GET RECEIPT HISTORY ERROR:', error)
+    return res.status(500).json({ message: 'Server Error', error: error.message })
+  }
+}
+
 // ================= DELETE RECEIPT =================
 export const deleteReceipt = async (req, res) => {
   try {
