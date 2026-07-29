@@ -41,7 +41,9 @@ export const scanReceipt = async (req, res) => {
       role: 'user',
       content: `You are a receipt parser for a sustainable spending tracker app.
 Below is raw text extracted from a receipt image using OCR.
-Parse it and return ONLY valid JSON, no extra text, no markdown backticks:
+The text may be messy or misaligned because receipts have items on the left and prices on the right.
+Carefully match each item name with its corresponding price.
+Return ONLY valid JSON, no extra text, no markdown backticks:
 {
   "storeName": "name of the store or vendor, use Unknown if not visible",
   "date": "date on the receipt in YYYY-MM-DD format, use today's date if not visible",
@@ -56,8 +58,11 @@ Parse it and return ONLY valid JSON, no extra text, no markdown backticks:
   "sustainabilityScore": 0,
   "sustainabilityTip": "one short sentence tip for more sustainable choices"
 }
-sustainabilityScore is 1 to 10 (10 = very sustainable).
-If you cannot identify a price, use 0.00.
+Rules:
+- Every item must have a price greater than 0 if a price exists anywhere on the receipt
+- totalAmount should be the final total shown on the receipt, not a sum you calculate
+- sustainabilityScore is 1 to 10 (10 = very sustainable)
+- If an item truly has no price, use 0.00
 
 Raw receipt text:
 ${parsedText}`
@@ -92,23 +97,38 @@ export const confirmReceipt = async (req, res) => {
       return res.status(400).json({ message: 'No items provided' })
     }
 
-    const expenses = await Promise.all(
-  items.map(item =>
-    prisma.expense.create({
-      data: {
+    // Prevent duplicate submissions within 10 seconds
+    const tenSecondsAgo = new Date(Date.now() - 10000)
+    const recentExpenses = await prisma.expense.count({
+      where: {
         userId: req.user.id,
-        amount: parseFloat(item.price),
-        category: category || 'Food',        // changed 'Other' to 'Food' for receipts
-        description: item.name,
-        sustainabilityScore: sustainabilityScore || null,
-        storeName: req.body.store || null,   // ← add this
-        receiptUrl: req.body.receiptImage || null, // ← add this
         isManual: false,
-        date: new Date()
+        createdAt: { gte: tenSecondsAgo }
       }
     })
-  )
-)
+
+    if (recentExpenses > 0) {
+      return res.status(409).json({ message: 'Receipt already saved. Please wait before submitting again.' })
+    }
+
+    const expenses = await Promise.all(
+      items.map(item =>
+        prisma.expense.create({
+          data: {
+            userId: req.user.id,
+            amount: parseFloat(item.price),
+            category: category || 'Food',
+            description: item.name,
+            sustainabilityScore: sustainabilityScore || null,
+            storeName: req.body.store || null,
+            receiptUrl: req.body.receiptImage || null,
+            isManual: false,
+            date: new Date()
+          }
+        })
+      )
+    )
+
     const user = await prisma.user.findUnique({
       where: { id: req.user.id }
     })
