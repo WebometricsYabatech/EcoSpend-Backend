@@ -59,12 +59,59 @@ export const getDashboard = async (req, res) => {
     // Top 3 spending categories
     const topCategories = categoryBreakdown.slice(0, 3)
 
-    // Recent 5 expenses
-    const recentExpenses = await prisma.expense.findMany({
+    // Recent 5 expenses grouped by receipt
+    // Items saved within 5 seconds of each other = one receipt
+    const allRecentExpenses = await prisma.expense.findMany({
       where: { userId },
-      orderBy: { date: 'desc' },
-      take: 5
+      orderBy: { createdAt: 'desc' },
+      take: 50
     })
+
+    // Group into receipts by createdAt proximity
+    const receiptGroups = []
+    let currentGroup = []
+    let lastTime = null
+
+    for (const expense of allRecentExpenses) {
+      const currentTime = new Date(expense.createdAt).getTime()
+      if (!lastTime || lastTime - currentTime <= 5000) {
+        currentGroup.push(expense)
+      } else {
+        if (currentGroup.length > 0) receiptGroups.push(currentGroup)
+        currentGroup = [expense]
+      }
+      lastTime = currentTime
+    }
+    if (currentGroup.length > 0) receiptGroups.push(currentGroup)
+
+    // Take 5 most recent receipt groups and summarise each
+    const recentReceipts = receiptGroups.slice(0, 5).map(group => ({
+      date: group[0].date,
+      storeName: group[0].storeName || 'Unknown Store',
+      itemCount: group.length,
+      totalAmount: group.reduce((sum, e) => sum + e.amount, 0),
+      category: group[0].category,
+      isManual: group[0].isManual
+    }))
+
+    // Count unique receipt scans
+    const scannedExpenses = await prisma.expense.findMany({
+      where: { userId, isManual: false },
+      orderBy: { createdAt: 'asc' },
+      select: { createdAt: true }
+    })
+
+    let receiptScans = 0
+    let lastScanTimestamp = null
+    for (const expense of scannedExpenses) {
+      const diff = lastScanTimestamp
+        ? new Date(expense.createdAt) - new Date(lastScanTimestamp)
+        : null
+      if (!lastScanTimestamp || diff > 5000) {
+        receiptScans++
+        lastScanTimestamp = expense.createdAt
+      }
+    }
 
     // Average sustainability score
     const scoredExpenses = thisMonthExpenses.filter(e => e.sustainabilityScore)
@@ -82,12 +129,13 @@ export const getDashboard = async (req, res) => {
         percentageUsed: user.budget
           ? Math.round((totalThisMonth / user.budget) * 100)
           : null,
-        isOverBudget: user.budget ? totalThisMonth > user.budget : false
+        isOverBudget: user.budget ? totalThisMonth > user.budget : false,
+        receiptScans
       },
       categoryBreakdown,
       topCategories,
       dailyChart,
-      recentExpenses,
+      recentReceipts,
       avgSustainabilityScore: avgSustainability
     })
 
