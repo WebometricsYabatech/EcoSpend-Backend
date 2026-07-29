@@ -28,6 +28,7 @@ export const scanReceipt = async (req, res) => {
     )
 
     const parsedText = ocrResponse.data?.ParsedResults?.[0]?.ParsedText
+    //console.log('OCR EXRACTED TEXT:', parsedText)
 
     if (!parsedText || parsedText.trim().length === 0) {
       return res.status(400).json({ message: 'Could not extract text from receipt' })
@@ -68,11 +69,30 @@ Raw receipt text:
 ${parsedText}`
     }
   ],
-  max_tokens: 1000
+  max_tokens: 2000
 })
     const responseText = groqResponse.choices[0].message.content
-    const cleanedText = responseText.replace(/```json|```/g, '').trim()
-    const extractedData = JSON.parse(cleanedText)
+//console.log('GROQ RAW RESPONSE:', responseText) // temporary debug
+
+// Clean markdown fences
+let cleanedText = responseText.replace(/```json|```/g, '').trim()
+
+// If JSON is incomplete, try to close it
+if (!cleanedText.endsWith('}')) {
+  cleanedText = cleanedText + '}'
+}
+
+let extractedData
+try {
+  extractedData = JSON.parse(cleanedText)
+} catch (parseError) {
+  console.error('JSON PARSE ERROR:', parseError.message)
+  console.error('RAW TEXT:', cleanedText)
+  return res.status(500).json({
+    message: 'AI returned invalid response, please try again',
+    error: parseError.message
+  })
+}
 
     return res.status(200).json({
       message: 'Receipt scanned successfully',
