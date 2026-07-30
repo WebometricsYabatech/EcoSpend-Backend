@@ -29,6 +29,7 @@ model Expense {
   storeName           String?
   description         String?
   sustainabilityScore Int?
+  sustainabilityTip   String?
   receiptUrl          String?
   isManual            Boolean  @default(false)
   date                DateTime @default(now())

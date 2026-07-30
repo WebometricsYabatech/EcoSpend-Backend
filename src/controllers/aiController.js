@@ -140,6 +140,7 @@ export const confirmReceipt = async (req, res) => {
             category: category || 'Food',
             description: item.name,
             sustainabilityScore: sustainabilityScore || null,
+            sustainabilityTip: sustainabilityTip || null,
             storeName: req.body.store || null,
             receiptUrl: req.body.receiptImage || null,
             isManual: false,
