@@ -44,9 +44,13 @@ export const getAdminDashboard = async (req, res) => {
       where: { sustainabilityScore: { not: null } },
       select: { sustainabilityScore: true }
     })
-    const avgSustainability = scoredExpenses.length > 0
-      ? Math.round(scoredExpenses.reduce((sum, e) => sum + e.sustainabilityScore, 0) / scoredExpenses.length)
-      : null
+    const avgSustainabilityRaw = scoredExpenses.length > 0
+       ? scoredExpenses.reduce((sum, e) => sum + e.sustainabilityScore, 0) / scoredExpenses.length
+       : null
+
+     const avgSustainability = avgSustainabilityRaw
+       ? Math.round((avgSustainabilityRaw / 10) * 100)
+       : null
 
     // Most active users (top 5 by expense count)
     const userExpenseCounts = await prisma.expense.groupBy({

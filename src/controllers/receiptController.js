@@ -38,7 +38,9 @@ export const getReceiptHistory = async (req, res) => {
       category: group[0].category,
       itemCount: group.length,
       totalAmount: group.reduce((sum, e) => sum + e.amount, 0),
-      sustainabilityScore: group[0].sustainabilityScore || null,
+      sustainabilityScore: group[0].sustainabilityScore
+       ? Math.round((group[0].sustainabilityScore / 10) * 100)
+       : null,      
       sustainabilityTip: group[0].sustainabilityTip || null,
       items: group.map(e => ({
         id: e.id,

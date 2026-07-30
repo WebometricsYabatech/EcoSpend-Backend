@@ -115,9 +115,13 @@ export const getDashboard = async (req, res) => {
 
     // Average sustainability score
     const scoredExpenses = thisMonthExpenses.filter(e => e.sustainabilityScore)
-    const avgSustainability = scoredExpenses.length > 0
-      ? Math.round(scoredExpenses.reduce((sum, e) => sum + e.sustainabilityScore, 0) / scoredExpenses.length)
-      : null
+    const avgSustainabilityRaw = scoredExpenses.length > 0
+     ? scoredExpenses.reduce((sum, e) => sum + e.sustainabilityScore, 0) / scoredExpenses.length
+     : null
+
+    const avgSustainability = avgSustainabilityRaw
+     ? Math.round((avgSustainabilityRaw / 10) * 100)
+     : null
 
     return res.status(200).json({
       overview: {
