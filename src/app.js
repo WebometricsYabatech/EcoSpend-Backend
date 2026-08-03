@@ -20,11 +20,17 @@ dotenv.config()
 const app = express()
 
 // ✅ Open CORS — allows all origins (safe for now, tighten after demo)
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean)
+
 app.use(cors({
-  origin: [
-    'http://localhost:5174',
-    'https://eco-spend-frontend.vercel.app'
-  ],
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true)
+    if (allowedOrigins.includes(origin)) return callback(null, true)
+    return callback(null, false)
+  },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
