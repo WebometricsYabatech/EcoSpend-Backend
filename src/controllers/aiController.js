@@ -11,8 +11,9 @@ export const scanReceipt = async (req, res) => {
       return res.status(400).json({ message: 'No receipt image uploaded' })
     }
 
-    // Step 1 — Send image to OCR.space API
     const formData = new FormData()
+    const isPDF = req.file.mimetype === 'application/pdf'
+
     formData.append('file', req.file.buffer, {
       filename: req.file.originalname,
       contentType: req.file.mimetype
@@ -20,6 +21,10 @@ export const scanReceipt = async (req, res) => {
     formData.append('apikey', process.env.OCR_SPACE_API_KEY)
     formData.append('language', 'eng')
     formData.append('isOverlayRequired', 'false')
+    formData.append('filetype', isPDF ? 'PDF' : 'Auto')
+    formData.append('detectOrientation', 'true')
+    formData.append('scale', 'true')
+
 
     const ocrResponse = await axios.post(
       'https://api.ocr.space/parse/image',
@@ -40,30 +45,47 @@ export const scanReceipt = async (req, res) => {
   messages: [
     {
       role: 'user',
-      content: `You are a receipt parser for a sustainable spending tracker app.
-Below is raw text extracted from a receipt image using OCR.
-The text may be messy or misaligned because receipts have items on the left and prices on the right.
-Carefully match each item name with its corresponding price.
-Return ONLY valid JSON, no extra text, no markdown backticks:
+      content: `You are an expert receipt analyst for a sustainable spending tracker app.
+Below is raw text extracted from a receipt using OCR. Analyse it carefully.
+
+Your job is to:
+1. Extract every purchased item and its exact price
+2. Determine the correct spending category based on the store type and items
+3. Calculate an honest sustainability score based on what was actually purchased
+
+Return ONLY valid JSON with no extra text, no markdown, no backticks:
 {
-  "storeName": "name of the store or vendor, use Unknown if not visible",
-  "date": "date on the receipt in YYYY-MM-DD format, use today's date if not visible",
+  "storeName": "exact store name from receipt or Unknown if not visible",
+  "date": "date in YYYY-MM-DD format or todays date if not visible",
   "items": [
     {
-      "name": "item name",
+      "name": "exact item name as written on receipt",
       "price": 0.00
     }
   ],
-  "category": "one of: Groceries, Food & Dining, Transport, Utilities, Clothing, Electronics, Health, Entertainment, Other",
+  "category": "choose the MOST ACCURATE category from this list based on what was purchased: Groceries, Food & Dining, Transport, Utilities, Clothing, Electronics, Health, Entertainment, Other",
   "totalAmount": 0.00,
   "sustainabilityScore": 0,
-  "sustainabilityTip": "one short sentence tip for more sustainable choices"
+  "sustainabilityTip": "one specific actionable tip based on what was actually purchased"
 }
-Rules:
-- Every item must have a price greater than 0 if a price exists anywhere on the receipt
-- totalAmount should be the final total shown on the receipt, not a sum you calculate
-- sustainabilityScore is 1 to 10 (10 = very sustainable)
-- If an item truly has no price, use 0.00
+
+Category selection rules — follow these strictly:
+- Groceries: supermarkets, food items bought to cook at home, fresh produce
+- Food & Dining: restaurants, cafes, fast food, takeaway, ready-to-eat food
+- Transport: fuel, bus tickets, ride hailing, car parts, parking
+- Utilities: electricity, water, internet, phone bills
+- Clothing: clothes, shoes, bags, accessories
+- Electronics: phones, laptops, gadgets, cables, accessories
+- Health: pharmacy, hospital, gym, medical supplies
+- Entertainment: cinema, games, events, subscriptions
+- Other: anything that does not clearly fit the above
+
+Sustainability score rules — be honest and specific, do NOT default to 5:
+- Score 8-10: fresh produce, local products, reusable items, plant-based food
+- Score 6-7: mixed shopping with some healthy or eco-friendly choices
+- Score 4-5: processed foods, convenience items, fast food
+- Score 2-3: fuel purchases, single-use plastics, heavily packaged goods
+- Score 1: luxury items, excessive consumption, environmentally harmful products
 
 Raw receipt text:
 ${parsedText}`

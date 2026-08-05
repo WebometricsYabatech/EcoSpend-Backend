@@ -9,10 +9,11 @@ const upload = multer({
     console.log('File received:', file.originalname)
     console.log('Mime type:', file.mimetype)
     const allowedTypes = [
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-      'image/webp'
+     'image/jpeg',
+     'image/jpg', 
+     'image/png',
+     'image/webp',
+     'application/pdf'
     ]
     if (allowedTypes.includes(file.mimetype)) {
       return cb(null, true)
