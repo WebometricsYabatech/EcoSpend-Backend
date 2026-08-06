@@ -25,7 +25,6 @@ export const scanReceipt = async (req, res) => {
     formData.append('detectOrientation', 'true')
     formData.append('scale', 'true')
 
-
     const ocrResponse = await axios.post(
       'https://api.ocr.space/parse/image',
       formData,
@@ -33,19 +32,17 @@ export const scanReceipt = async (req, res) => {
     )
 
     const parsedText = ocrResponse.data?.ParsedResults?.[0]?.ParsedText
-    //console.log('OCR EXRACTED TEXT:', parsedText)
 
     if (!parsedText || parsedText.trim().length === 0) {
       return res.status(400).json({ message: 'Could not extract text from receipt' })
     }
 
-    // Step 2 — Send extracted text to Groq to structure as JSON
     const groqResponse = await groq.chat.completions.create({
-  model: 'openai/gpt-oss-20b',
-  messages: [
-    {
-      role: 'user',
-      content: `You are an expert receipt analyst for a sustainable spending tracker app.
+      model: 'openai/gpt-oss-20b',
+      messages: [
+        {
+          role: 'user',
+          content: `You are an expert receipt analyst for a sustainable spending tracker app.
 Below is raw text extracted from a receipt using OCR. Analyse it carefully.
 
 Your job is to:
@@ -89,32 +86,30 @@ Sustainability score rules — be honest and specific, do NOT default to 5:
 
 Raw receipt text:
 ${parsedText}`
-    }
-  ],
-  max_tokens: 2000
-})
+        }
+      ],
+      max_tokens: 2000
+    })
+
     const responseText = groqResponse.choices[0].message.content
-//console.log('GROQ RAW RESPONSE:', responseText) // temporary debug
 
-// Clean markdown fences
-let cleanedText = responseText.replace(/```json|```/g, '').trim()
+    let cleanedText = responseText.replace(/```json|```/g, '').trim()
 
-// If JSON is incomplete, try to close it
-if (!cleanedText.endsWith('}')) {
-  cleanedText = cleanedText + '}'
-}
+    if (!cleanedText.endsWith('}')) {
+      cleanedText = cleanedText + '}'
+    }
 
-let extractedData
-try {
-  extractedData = JSON.parse(cleanedText)
-} catch (parseError) {
-  console.error('JSON PARSE ERROR:', parseError.message)
-  console.error('RAW TEXT:', cleanedText)
-  return res.status(500).json({
-    message: 'AI returned invalid response, please try again',
-    error: parseError.message
-  })
-}
+    let extractedData
+    try {
+      extractedData = JSON.parse(cleanedText)
+    } catch (parseError) {
+      console.error('JSON PARSE ERROR:', parseError.message)
+      console.error('RAW TEXT:', cleanedText)
+      return res.status(500).json({
+        message: 'AI returned invalid response, please try again',
+        error: parseError.message
+      })
+    }
 
     return res.status(200).json({
       message: 'Receipt scanned successfully',
@@ -153,13 +148,35 @@ export const confirmReceipt = async (req, res) => {
       return res.status(409).json({ message: 'Receipt already saved. Please wait before submitting again.' })
     }
 
+    // ── Auto-save custom category if not in default list ──
+    const defaultCategories = [
+      'Groceries', 'Food & Dining', 'Transport', 'Utilities',
+      'Clothing', 'Electronics', 'Health', 'Entertainment', 'Other'
+    ]
+
+    if (category && !defaultCategories.includes(category)) {
+      const existingCategory = await prisma.category.findFirst({
+        where: { userId: req.user.id, name: category }
+      })
+
+      if (!existingCategory) {
+        await prisma.category.create({
+          data: {
+            name: category,
+            userId: req.user.id
+          }
+        })
+      }
+    }
+
+    // ── Save all items as expenses ──
     const expenses = await Promise.all(
       items.map(item =>
         prisma.expense.create({
           data: {
             userId: req.user.id,
             amount: parseFloat(item.price),
-            category: category || 'Food',
+            category: category || 'Other',
             description: item.name,
             sustainabilityScore: sustainabilityScore ? parseInt(sustainabilityScore) : 5,
             sustainabilityTip: sustainabilityTip || 'Consider eco-friendly alternatives for a greener lifestyle.',
