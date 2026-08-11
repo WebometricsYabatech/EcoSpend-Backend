@@ -10,12 +10,13 @@ datasource db {
 
 model User {
   id        String    @id @default(uuid())
-  fullname      String
+  fullname  String
   email     String    @unique
   password  String
   budget    Float?
   token     String?
   avatarUrl String?
+  currency  String?   @default("NGN")
   expenses  Expense[]
   categories Category[]
   createdAt DateTime  @default(now())

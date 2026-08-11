@@ -11,6 +11,7 @@ export const getProfile = async (req, res) => {
         fullname: true,
         email: true,
         budget: true,
+        currency: true,
         createdAt: true
       }
     })
@@ -25,13 +26,12 @@ export const getProfile = async (req, res) => {
 // UPDATE profile
 export const updateProfile = async (req, res) => {
   try {
-    const { fullname, email } = req.body
+    const { fullname, email, currency } = req.body  // add currency
 
-    if (!fullname && !email) {
+    if (!fullname && !email && !currency) {
       return res.status(400).json({ message: 'Provide at least one field to update' })
     }
 
-    // Check if new email is already taken by another user
     if (email) {
       const existingUser = await prisma.user.findUnique({ where: { email } })
       if (existingUser && existingUser.id !== req.user.id) {
@@ -43,13 +43,16 @@ export const updateProfile = async (req, res) => {
       where: { id: req.user.id },
       data: {
         ...(fullname && { fullname }),
-        ...(email && { email })
+        ...(email && { email }),
+        ...(currency && { currency })  // add this
       },
       select: {
         id: true,
         fullname: true,
         email: true,
         budget: true,
+        avatarUrl: true,
+        currency: true,  // add this
         createdAt: true
       }
     })

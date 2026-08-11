@@ -2,15 +2,31 @@ import Groq from 'groq-sdk'
 import axios from 'axios'
 import FormData from 'form-data'
 import prisma from '../lib/prisma.js'
+import cloudinary from '../middleware/cloudinary.js'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
+// ================= SCAN RECEIPT =================
 export const scanReceipt = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No receipt image uploaded' })
     }
 
+    // ── Upload receipt to Cloudinary for preview ──
+    let receiptImageUrl = null
+    try {
+      const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`
+      const uploadResult = await cloudinary.uploader.upload(dataUri, {
+        folder: 'ecospend/receipts',
+        resource_type: 'auto'
+      })
+      receiptImageUrl = uploadResult.secure_url
+    } catch (uploadError) {
+      console.error('Cloudinary upload error:', uploadError.message)
+    }
+
+    // ── Send to OCR.space for text extraction ──
     const formData = new FormData()
     const isPDF = req.file.mimetype === 'application/pdf'
 
@@ -37,6 +53,7 @@ export const scanReceipt = async (req, res) => {
       return res.status(400).json({ message: 'Could not extract text from receipt' })
     }
 
+    // ── Send extracted text to Groq ──
     const groqResponse = await groq.chat.completions.create({
       model: 'openai/gpt-oss-20b',
       messages: [
@@ -95,8 +112,11 @@ ${parsedText}`
 
     let cleanedText = responseText.replace(/```json|```/g, '').trim()
 
-    if (!cleanedText.endsWith('}')) {
-      cleanedText = cleanedText + '}'
+    // Smart JSON closing — only add braces if genuinely missing
+    const openBraces = (cleanedText.match(/{/g) || []).length
+    const closeBraces = (cleanedText.match(/}/g) || []).length
+    if (openBraces > closeBraces) {
+      cleanedText = cleanedText + '}'.repeat(openBraces - closeBraces)
     }
 
     let extractedData
@@ -113,6 +133,7 @@ ${parsedText}`
 
     return res.status(200).json({
       message: 'Receipt scanned successfully',
+      receiptImageUrl,
       extractedData
     })
 
@@ -129,6 +150,9 @@ ${parsedText}`
 export const confirmReceipt = async (req, res) => {
   try {
     const { items, category, totalAmount, sustainabilityScore, sustainabilityTip } = req.body
+
+    // Debug log — check what score is arriving from frontend
+    console.log('RECEIVED SCORE:', sustainabilityScore, typeof sustainabilityScore)
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'No items provided' })
@@ -178,7 +202,9 @@ export const confirmReceipt = async (req, res) => {
             amount: parseFloat(item.price),
             category: category || 'Other',
             description: item.name,
-            sustainabilityScore: sustainabilityScore ? parseInt(sustainabilityScore) : 5,
+            sustainabilityScore: sustainabilityScore && parseInt(sustainabilityScore) > 0
+              ? parseInt(sustainabilityScore)
+              : 5,
             sustainabilityTip: sustainabilityTip || 'Consider eco-friendly alternatives for a greener lifestyle.',
             storeName: req.body.store || null,
             receiptUrl: req.body.receiptImage || null,

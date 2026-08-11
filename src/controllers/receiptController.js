@@ -30,24 +30,34 @@ export const getReceiptHistory = async (req, res) => {
     if (currentGroup.length > 0) receiptGroups.push(currentGroup)
 
     // Format each receipt group
-    const receipts = receiptGroups.map((group, index) => ({
-      receiptId: `receipt-${group[0].createdAt.getTime()}`,
-      storeName: group[0].storeName || 'Unknown Store',
-      date: group[0].date,
-      scannedAt: group[0].createdAt,
-      category: group[0].category,
-      itemCount: group.length,
-      totalAmount: group.reduce((sum, e) => sum + e.amount, 0),
-      sustainabilityScore: group[0].sustainabilityScore
-       ? Math.round((group[0].sustainabilityScore / 10) * 100)
-       : null,      
-      sustainabilityTip: group[0].sustainabilityTip || null,
-      items: group.map(e => ({
-        id: e.id,
-        name: e.description,
-        price: e.amount
-      }))
+const receipts = receiptGroups.map((group, index) => {
+  // Find first item that actually has a score and tip
+  const scoredItem = group.find(e => e.sustainabilityScore && e.sustainabilityScore > 0)
+  const tippedItem = group.find(e => e.sustainabilityTip)
+
+  return {
+    receiptId: `receipt-${group[0].createdAt.getTime()}`,
+    storeName: group[0].storeName || 'Unknown Store',
+    date: group[0].date,
+    scannedAt: group[0].createdAt,
+    category: group[0].category,
+    itemCount: group.length,
+    totalAmount: group.reduce((sum, e) => sum + e.amount, 0),
+    sustainabilityScore: scoredItem
+      ? Math.round((scoredItem.sustainabilityScore / 10) * 100)
+      : null,
+    sustainabilityTip: tippedItem ? tippedItem.sustainabilityTip : null,
+    items: group.map(e => ({
+      id: e.id,
+      name: e.description,
+      price: e.amount,
+      sustainabilityScore: e.sustainabilityScore
+        ? Math.round((e.sustainabilityScore / 10) * 100)
+        : null,
+      sustainabilityTip: e.sustainabilityTip || null
     }))
+  }
+})
 
     // Pagination
     const total = receipts.length
