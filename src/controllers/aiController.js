@@ -110,26 +110,28 @@ ${parsedText}`
 
     const responseText = groqResponse.choices[0].message.content
 
-    let cleanedText = responseText.replace(/```json|```/g, '').trim()
+let cleanedText = responseText.replace(/```json|```/g, '').trim()
 
-    // Smart JSON closing — only add braces if genuinely missing
-    const openBraces = (cleanedText.match(/{/g) || []).length
-    const closeBraces = (cleanedText.match(/}/g) || []).length
-    if (openBraces > closeBraces) {
-      cleanedText = cleanedText + '}'.repeat(openBraces - closeBraces)
-    }
+// Extract JSON object if wrapped in other text
+const jsonMatch = cleanedText.match(/\{[\s\S]*\}/)
+if (!jsonMatch) {
+  return res.status(500).json({
+    message: 'AI returned invalid response, please try again'
+  })
+}
+cleanedText = jsonMatch[0]
 
-    let extractedData
-    try {
-      extractedData = JSON.parse(cleanedText)
-    } catch (parseError) {
-      console.error('JSON PARSE ERROR:', parseError.message)
-      console.error('RAW TEXT:', cleanedText)
-      return res.status(500).json({
-        message: 'AI returned invalid response, please try again',
-        error: parseError.message
-      })
-    }
+let extractedData
+try {
+  extractedData = JSON.parse(cleanedText)
+} catch (parseError) {
+  console.error('JSON PARSE ERROR:', parseError.message)
+  console.error('RAW TEXT:', cleanedText)
+  return res.status(500).json({
+    message: 'AI returned invalid response, please try again',
+    error: parseError.message
+  })
+}
 
     return res.status(200).json({
       message: 'Receipt scanned successfully',
@@ -199,7 +201,7 @@ export const confirmReceipt = async (req, res) => {
         prisma.expense.create({
           data: {
             userId: req.user.id,
-            amount: parseFloat(item.price),
+            amount: Math.round(parseFloat(item.price) * 100) / 100,
             category: category || 'Other',
             description: item.name,
             sustainabilityScore: sustainabilityScore && parseInt(sustainabilityScore) > 0

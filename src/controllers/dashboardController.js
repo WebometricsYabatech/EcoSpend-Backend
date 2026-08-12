@@ -89,7 +89,7 @@ export const getDashboard = async (req, res) => {
       date: group[0].date,
       storeName: group[0].storeName || 'Unknown Store',
       itemCount: group.length,
-      totalAmount: group.reduce((sum, e) => sum + e.amount, 0),
+      totalAmount: Math.round(group.reduce((sum, e) => sum + e.amount, 0) * 100) / 100,
       category: group[0].category,
       isManual: group[0].isManual
     }))

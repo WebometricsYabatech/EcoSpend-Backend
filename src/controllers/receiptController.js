@@ -42,7 +42,7 @@ const receipts = receiptGroups.map((group, index) => {
     scannedAt: group[0].createdAt,
     category: group[0].category,
     itemCount: group.length,
-    totalAmount: group.reduce((sum, e) => sum + e.amount, 0),
+    totalAmount: Math.round(group.reduce((sum, e) => sum + e.amount, 0) * 100) / 100,
     sustainabilityScore: scoredItem
       ? Math.round((scoredItem.sustainabilityScore / 10) * 100)
       : null,
