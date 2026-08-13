@@ -4,7 +4,15 @@ import FormData from 'form-data'
 import prisma from '../lib/prisma.js'
 import cloudinary from '../middleware/cloudinary.js'
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+const getGroqClient = () => {
+  const apiKey = process.env.GROQ_API_KEY
+
+  if (!apiKey) {
+    return null
+  }
+
+  return new Groq({ apiKey })
+}
 
 // ================= SCAN RECEIPT =================
 export const scanReceipt = async (req, res) => {
@@ -53,8 +61,16 @@ export const scanReceipt = async (req, res) => {
       return res.status(400).json({ message: 'Could not extract text from receipt' })
     }
 
+    const groqClient = getGroqClient()
+
+    if (!groqClient) {
+      return res.status(500).json({
+        message: 'Groq API key is not configured. Please add GROQ_API_KEY to the environment.'
+      })
+    }
+
     // ── Send extracted text to Groq ──
-    const groqResponse = await groq.chat.completions.create({
+    const groqResponse = await groqClient.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       messages: [
         {

@@ -1,6 +1,8 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import swaggerDocument from './swagger.js'
 // import path from 'path' // not needed since we removed disk storage
 
@@ -16,7 +18,10 @@ import transactionRoutes from './routes/transactions.js'
 import userRoutes from './routes/user.js'
 import adminRoutes from './routes/admin.js'
 
-dotenv.config()
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+dotenv.config({ path: path.resolve(__dirname, '../.env') })
 
 const app = express()
 
