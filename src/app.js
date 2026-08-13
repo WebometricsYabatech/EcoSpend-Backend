@@ -1,6 +1,9 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import swaggerDocument from './swagger.js'
 // import path from 'path' // not needed since we removed disk storage
 
 import expenseRoutes from './routes/expenses.js'
@@ -15,7 +18,10 @@ import transactionRoutes from './routes/transactions.js'
 import userRoutes from './routes/user.js'
 import adminRoutes from './routes/admin.js'
 
-dotenv.config()
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+dotenv.config({ path: path.resolve(__dirname, '../.env') })
 
 const app = express()
 
@@ -38,6 +44,46 @@ app.use(cors({
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
+
+const swaggerHtml = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>EcoSpend API Docs</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css" />
+    <style>
+      body { margin: 0; background: #f5f7fb; }
+      #swagger-ui { max-width: 1100px; margin: 20px auto; }
+      .topbar { display: none; }
+    </style>
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js"></script>
+    <script>
+      window.onload = () => {
+        SwaggerUIBundle({
+          url: '/api-docs.json',
+          dom_id: '#swagger-ui',
+          deepLinking: true,
+          persistAuthorization: true,
+          presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+          layout: 'BaseLayout',
+          theme: 'agate'
+        })
+      }
+    </script>
+  </body>
+</html>`
+
+app.get('/api-docs', (req, res) => {
+  res.type('html').send(swaggerHtml)
+})
+
+app.get('/api-docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json')
+  res.send(swaggerDocument)
+})
 
 // API routes
 app.use('/api/auth', authRoutes)
