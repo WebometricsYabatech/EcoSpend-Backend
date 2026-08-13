@@ -1,3 +1,5 @@
+const productionHost = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:5000'
+
 const swaggerDocument = {
   openapi: '3.0.0',
   info: {
@@ -7,17 +9,8 @@ const swaggerDocument = {
   },
   servers: [
     {
-      url: 'http://localhost:5000',
-      description: 'Local development server'
-    },
-    {
-      url: 'https://{host}',
-      description: 'Production server',
-      variables: {
-        host: {
-          default: 'your-domain.com'
-        }
-      }
+      url: productionHost,
+      description: process.env.VERCEL_URL ? 'Production server' : 'Local development server'
     }
   ],
   tags: [
