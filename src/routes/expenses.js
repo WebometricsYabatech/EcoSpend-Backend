@@ -11,7 +11,6 @@ import {
 
 const router = express.Router()
 
-// All routes below require login
 router.use(protect)
 
 router.post('/', addExpense)
