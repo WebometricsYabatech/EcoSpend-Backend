@@ -32,6 +32,7 @@ model Expense {
   sustainabilityScore Int?
   sustainabilityTip   String?
   receiptUrl          String?
+  receiptTotal        Float?
   isManual            Boolean  @default(false)
   date                DateTime @default(now())
   createdAt           DateTime @default(now())

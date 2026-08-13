@@ -29,11 +29,15 @@ export const getReceiptHistory = async (req, res) => {
     }
     if (currentGroup.length > 0) receiptGroups.push(currentGroup)
 
-    // Format each receipt group
+// Format each receipt group
 const receipts = receiptGroups.map((group, index) => {
   // Find first item that actually has a score and tip
   const scoredItem = group.find(e => e.sustainabilityScore && e.sustainabilityScore > 0)
   const tippedItem = group.find(e => e.sustainabilityTip)
+
+  // Use stored receiptTotal from first item if available, otherwise sum items
+  const totalAmount = group[0].receiptTotal ||
+    Math.round(group.reduce((sum, e) => sum + e.amount, 0) * 100) / 100
 
   return {
     receiptId: `receipt-${group[0].createdAt.getTime()}`,
@@ -42,7 +46,7 @@ const receipts = receiptGroups.map((group, index) => {
     scannedAt: group[0].createdAt,
     category: group[0].category,
     itemCount: group.length,
-    totalAmount: Math.round(group.reduce((sum, e) => sum + e.amount, 0) * 100) / 100,
+    totalAmount,
     sustainabilityScore: scoredItem
       ? Math.round((scoredItem.sustainabilityScore / 10) * 100)
       : null,

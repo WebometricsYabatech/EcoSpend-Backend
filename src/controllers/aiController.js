@@ -196,27 +196,29 @@ export const confirmReceipt = async (req, res) => {
     }
 
     // ── Save all items as expenses ──
-    const expenses = await Promise.all(
-      items.map(item =>
-        prisma.expense.create({
-          data: {
-            userId: req.user.id,
-            amount: Math.round(parseFloat(item.price) * 100) / 100,
-            category: category || 'Other',
-            description: item.name,
-            sustainabilityScore: sustainabilityScore && parseInt(sustainabilityScore) > 0
-              ? parseInt(sustainabilityScore)
-              : 5,
-            sustainabilityTip: sustainabilityTip || 'Consider eco-friendly alternatives for a greener lifestyle.',
-            storeName: req.body.store || null,
-            receiptUrl: req.body.receiptImage || null,
-            isManual: false,
-            date: new Date()
-          }
-        })
-      )
-    )
-
+const expenses = await Promise.all(
+  items.map((item, index) =>
+    prisma.expense.create({
+      data: {
+        userId: req.user.id,
+        amount: Math.round(parseFloat(item.price) * 100) / 100,
+        category: category || 'Other',
+        description: item.name,
+        sustainabilityScore: sustainabilityScore && parseInt(sustainabilityScore) > 0
+          ? parseInt(sustainabilityScore)
+          : 5,
+        sustainabilityTip: sustainabilityTip || 'Consider eco-friendly alternatives for a greener lifestyle.',
+        storeName: req.body.store || null,
+        receiptUrl: req.body.receiptImage || null,
+        receiptTotal: index === 0
+          ? Math.round(parseFloat(totalAmount) * 100) / 100
+          : null,
+        isManual: false,
+        date: new Date()
+      }
+    })
+  )
+)
     const user = await prisma.user.findUnique({
       where: { id: req.user.id }
     })
