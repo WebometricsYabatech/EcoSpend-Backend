@@ -69,13 +69,8 @@ export const scanReceipt = async (req, res) => {
       })
     }
 
-    // ── Send extracted text to Groq ──
-    const groqResponse = await groqClient.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        {
-          role: 'user',
-          content: `You are an expert receipt analyst for a sustainable spending tracker app.
+    // ── Send extracted text to Groq with fallback models ──
+    const prompt = `You are an expert receipt analyst for a sustainable spending tracker app.
 Below is raw text extracted from a receipt using OCR. Analyse it carefully.
 
 Your job is to:
@@ -119,35 +114,49 @@ Sustainability score rules — be honest and specific, do NOT default to 5:
 
 Raw receipt text:
 ${parsedText}`
-        }
-      ],
-      max_tokens: 2000
-    })
+
+    const models = ['openai/gpt-oss-20b', 'llama-3.1-8b-instant']
+    let groqResponse
+
+    for (const model of models) {
+      try {
+        groqResponse = await groqClient.chat.completions.create({
+          model,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 2000
+        })
+        console.log(`Used model: ${model}`)
+        break
+      } catch (err) {
+        console.error(`Model ${model} failed:`, err.message)
+        if (model === models[models.length - 1]) throw err
+      }
+    }
 
     const responseText = groqResponse.choices[0].message.content
 
-let cleanedText = responseText.replace(/```json|```/g, '').trim()
+    let cleanedText = responseText.replace(/```json|```/g, '').trim()
 
-// Extract JSON object if wrapped in other text
-const jsonMatch = cleanedText.match(/\{[\s\S]*\}/)
-if (!jsonMatch) {
-  return res.status(500).json({
-    message: 'AI returned invalid response, please try again'
-  })
-}
-cleanedText = jsonMatch[0]
+    // Extract JSON object if wrapped in other text
+    const jsonMatch = cleanedText.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      return res.status(500).json({
+        message: 'AI returned invalid response, please try again'
+      })
+    }
+    cleanedText = jsonMatch[0]
 
-let extractedData
-try {
-  extractedData = JSON.parse(cleanedText)
-} catch (parseError) {
-  console.error('JSON PARSE ERROR:', parseError.message)
-  console.error('RAW TEXT:', cleanedText)
-  return res.status(500).json({
-    message: 'AI returned invalid response, please try again',
-    error: parseError.message
-  })
-}
+    let extractedData
+    try {
+      extractedData = JSON.parse(cleanedText)
+    } catch (parseError) {
+      console.error('JSON PARSE ERROR:', parseError.message)
+      console.error('RAW TEXT:', cleanedText)
+      return res.status(500).json({
+        message: 'AI returned invalid response, please try again',
+        error: parseError.message
+      })
+    }
 
     return res.status(200).json({
       message: 'Receipt scanned successfully',
@@ -162,7 +171,7 @@ try {
       error: error.message
     })
   }
-}
+}   
 
 // ================= CONFIRM & SAVE RECEIPT =================
 export const confirmReceipt = async (req, res) => {
