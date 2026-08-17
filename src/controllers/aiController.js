@@ -52,7 +52,7 @@ export const scanReceipt = async (req, res) => {
     const ocrResponse = await axios.post(
       'https://api.ocr.space/parse/image',
       formData,
-      { headers: formData.getHeaders(), timeout: 20000 }
+      { headers: formData.getHeaders(), timeout: 55000 }
     )
 
     const parsedText = ocrResponse.data?.ParsedResults?.[0]?.ParsedText
