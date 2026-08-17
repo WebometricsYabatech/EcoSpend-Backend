@@ -35,26 +35,25 @@ export const scanReceipt = async (req, res) => {
     }
 
     // ── Send to OCR.space for text extraction ──
-    // ── Send to OCR.space (faster base64 method) ──
-const base64Image = req.file.buffer.toString('base64')
-const base64String = `data:${req.file.mimetype};base64,${base64Image}`
+    const formData = new FormData()
+    const isPDF = req.file.mimetype === 'application/pdf'
 
-const ocrResponse = await axios.post(
-  'https://api.ocr.space/parse/image',
-  new URLSearchParams({
-    apikey: process.env.OCR_SPACE_API_KEY,
-    base64Image: base64String,
-    language: 'eng',
-    isOverlayRequired: 'false',
-    detectOrientation: 'true',
-    scale: 'true',
-    OCREngine: '2'  // Engine 2 is faster and more accurate
-  }),
-  {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    timeout: 30000  // reduce to 30s
-  }
-)
+    formData.append('file', req.file.buffer, {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype
+    })
+    formData.append('apikey', process.env.OCR_SPACE_API_KEY)
+    formData.append('language', 'eng')
+    formData.append('isOverlayRequired', 'false')
+    formData.append('filetype', isPDF ? 'PDF' : 'Auto')
+    formData.append('detectOrientation', 'true')
+    formData.append('scale', 'true')
+
+    const ocrResponse = await axios.post(
+      'https://api.ocr.space/parse/image',
+      formData,
+      { headers: formData.getHeaders(), timeout: 55000 }
+    )
 
     const parsedText = ocrResponse.data?.ParsedResults?.[0]?.ParsedText
 
