@@ -22,7 +22,7 @@ export const scanReceipt = async (req, res) => {
     }
 
     // ── Upload receipt to Cloudinary for preview ──
-    let receiptImageUrl = null
+    let receiptUrl = null
     try {
       const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`
       const uploadResult = await cloudinary.uploader.upload(dataUri, {
@@ -160,7 +160,7 @@ ${parsedText}`
 
     return res.status(200).json({
       message: 'Receipt scanned successfully',
-      receiptImageUrl,
+      receiptUrl,
       extractedData
     })
 
@@ -234,7 +234,7 @@ const expenses = await Promise.all(
           : 5,
         sustainabilityTip: sustainabilityTip || 'Consider eco-friendly alternatives for a greener lifestyle.',
         storeName: req.body.store || null,
-        receiptUrl: req.body.receiptImage || null,
+        receiptUrl: req.body.receiptUrl || null,
         receiptTotal: index === 0
           ? Math.round(parseFloat(totalAmount) * 100) / 100
           : null,

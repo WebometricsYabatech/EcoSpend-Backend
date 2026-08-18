@@ -6,13 +6,11 @@ export const getReceiptHistory = async (req, res) => {
     const userId = req.user.id
     const { page = 1, limit = 10 } = req.query
 
-    // Get all scanned expenses ordered by createdAt
     const allScannedExpenses = await prisma.expense.findMany({
       where: { userId, isManual: false },
       orderBy: { createdAt: 'desc' }
     })
 
-    // Group items into receipts by createdAt proximity (5 seconds = one receipt)
     const receiptGroups = []
     let currentGroup = []
     let lastTime = null
@@ -29,41 +27,38 @@ export const getReceiptHistory = async (req, res) => {
     }
     if (currentGroup.length > 0) receiptGroups.push(currentGroup)
 
-// Format each receipt group
-const receipts = receiptGroups.map((group, index) => {
-  // Find first item that actually has a score and tip
-  const scoredItem = group.find(e => e.sustainabilityScore && e.sustainabilityScore > 0)
-  const tippedItem = group.find(e => e.sustainabilityTip)
+    const receipts = receiptGroups.map((group) => {
+      const scoredItem = group.find(e => e.sustainabilityScore && e.sustainabilityScore > 0)
+      const tippedItem = group.find(e => e.sustainabilityTip)
+      const totalAmount = group[0].receiptTotal ||
+        Math.round(group.reduce((sum, e) => sum + e.amount, 0) * 100) / 100
 
-  // Use stored receiptTotal from first item if available, otherwise sum items
-  const totalAmount = group[0].receiptTotal ||
-    Math.round(group.reduce((sum, e) => sum + e.amount, 0) * 100) / 100
+      return {
+        receiptId: `receipt-${group[0].createdAt.getTime()}`,
+        storeName: group[0].storeName || 'Unknown Store',
+        date: group[0].date,
+        scannedAt: group[0].createdAt,
+        category: group[0].category,
+        itemCount: group.length,
+        totalAmount,
+        receiptUrl: group[0].receiptUrl || null,
+        sustainabilityScore: scoredItem
+          ? Math.round((scoredItem.sustainabilityScore / 10) * 100)
+          : null,
+        sustainabilityTip: tippedItem ? tippedItem.sustainabilityTip : null,
+        items: group.map(e => ({
+          id: e.id,
+          name: e.description,
+          price: e.amount,
+          receiptUrl: e.receiptUrl || null,
+          sustainabilityScore: e.sustainabilityScore
+            ? Math.round((e.sustainabilityScore / 10) * 100)
+            : null,
+          sustainabilityTip: e.sustainabilityTip || null
+        }))
+      }
+    })
 
-  return {
-    receiptId: `receipt-${group[0].createdAt.getTime()}`,
-    storeName: group[0].storeName || 'Unknown Store',
-    date: group[0].date,
-    scannedAt: group[0].createdAt,
-    category: group[0].category,
-    itemCount: group.length,
-    totalAmount,
-    sustainabilityScore: scoredItem
-      ? Math.round((scoredItem.sustainabilityScore / 10) * 100)
-      : null,
-    sustainabilityTip: tippedItem ? tippedItem.sustainabilityTip : null,
-    items: group.map(e => ({
-      id: e.id,
-      name: e.description,
-      price: e.amount,
-      sustainabilityScore: e.sustainabilityScore
-        ? Math.round((e.sustainabilityScore / 10) * 100)
-        : null,
-      sustainabilityTip: e.sustainabilityTip || null
-    }))
-  }
-})
-
-    // Pagination
     const total = receipts.length
     const skip = (parseInt(page) - 1) * parseInt(limit)
     const paginated = receipts.slice(skip, skip + parseInt(limit))
@@ -87,29 +82,64 @@ const receipts = receiptGroups.map((group, index) => {
   }
 }
 
-// ================= DELETE RECEIPT =================
+// ================= DELETE ONE RECEIPT (and all its items) =================
 export const deleteReceipt = async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.user.id
 
-    // Check receipt exists and belongs to this user
-    const expense = await prisma.expense.findUnique({
-      where: { id }
-    })
+    const expense = await prisma.expense.findUnique({ where: { id } })
 
     if (!expense) {
       return res.status(404).json({ message: 'Receipt not found' })
     }
 
-    if (expense.userId !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to delete this receipt' })
+    if (expense.userId !== userId) {
+      return res.status(403).json({ message: 'Not authorized' })
     }
 
-    await prisma.expense.delete({ where: { id } })
+    // Find all items in the same receipt group (within 5 seconds)
+    const receiptTime = new Date(expense.createdAt).getTime()
+    const allExpenses = await prisma.expense.findMany({
+      where: { userId, isManual: false }
+    })
 
-    return res.status(200).json({ message: 'Receipt deleted successfully' })
+    const groupIds = allExpenses
+      .filter(e => Math.abs(new Date(e.createdAt).getTime() - receiptTime) <= 5000)
+      .map(e => e.id)
+
+    await prisma.expense.deleteMany({
+      where: { id: { in: groupIds }, userId }
+    })
+
+    return res.status(200).json({
+      message: 'Receipt deleted successfully',
+      deletedCount: groupIds.length
+    })
+
   } catch (error) {
     console.error('DELETE RECEIPT ERROR:', error)
+    return res.status(500).json({ message: 'Server Error', error: error.message })
+  }
+}
+
+// ================= DELETE ALL RECEIPTS =================
+export const deleteAllReceipts = async (req, res) => {
+  try {
+    const deleted = await prisma.expense.deleteMany({
+      where: {
+        userId: req.user.id,
+        isManual: false
+      }
+    })
+
+    return res.status(200).json({
+      message: 'All receipts deleted successfully',
+      deletedCount: deleted.count
+    })
+
+  } catch (error) {
+    console.error('DELETE ALL RECEIPTS ERROR:', error)
     return res.status(500).json({ message: 'Server Error', error: error.message })
   }
 }

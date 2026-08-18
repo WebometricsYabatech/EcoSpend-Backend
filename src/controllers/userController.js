@@ -12,6 +12,7 @@ export const getProfile = async (req, res) => {
         email: true,
         budget: true,
         avatarUrl: true,
+        currency: true,
         createdAt: true
       }
     })
@@ -28,20 +29,22 @@ export const getProfile = async (req, res) => {
 
 // UPDATE profile (fullname and/or budget)
 export const updateProfile = async (req, res) => {
-  const { fullname, budget } = req.body
+  const { fullname, budget, currency } = req.body
 
   try {
     const user = await prisma.user.update({
       where: { id: req.user.id },
       data: {
         fullname: fullname ?? undefined,
-        budget: budget ? parseFloat(budget) : undefined
+        budget: budget ? parseFloat(budget) : undefined,
+        currency: currency ?? undefined
       },
       select: {
         id: true,
         fullname: true,
         email: true,
         budget: true,
+        currency: true,
         avatarUrl: true,
         createdAt: true
       }
