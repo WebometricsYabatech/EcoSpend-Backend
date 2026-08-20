@@ -29,7 +29,7 @@ export const scanReceipt = async (req, res) => {
         folder: 'ecospend/receipts',
         resource_type: 'auto'
       })
-      receiptImageUrl = uploadResult.secure_url
+      receiptUrl = uploadResult.secure_url
     } catch (uploadError) {
       console.error('Cloudinary upload error:', uploadError.message)
     }
