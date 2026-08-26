@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import prisma from '../lib/prisma.js'
-
+import { sendWelcomeEmail } from '../utils/email.js'
 
 // REGISTER
 export const register = async (req, res) => {
@@ -18,6 +18,9 @@ export const register = async (req, res) => {
     const user = await prisma.user.create({
       data: { fullname, email, password: hashedPassword }
     })
+
+    // Send welcome email
+    await sendWelcomeEmail(user.email, user.fullname)
 
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
       expiresIn: '7d'
