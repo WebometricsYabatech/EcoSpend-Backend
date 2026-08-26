@@ -3,7 +3,7 @@ import axios from 'axios'
 import FormData from 'form-data'
 import prisma from '../lib/prisma.js'
 import cloudinary from '../middleware/cloudinary.js'
-import { sendBudgetAlertEmail } from '../utils/email,js'
+import { sendBudgetAlertEmail } from '../utils/email.js'
 
 const getGroqClient = () => {
   const apiKey = process.env.GROQ_API_KEY
@@ -264,7 +264,7 @@ const expenses = await Promise.all(
     const isNearBudget = user.budget && totalSpent >= user.budget * 0.8
 
     if (isOverBudget || isNearBudget) {
-      await sendBudgetAlertEmail(user.email, user.fullname, totalSpent, user.budget)
+      await sendBudgetAlertEmail(user, totalSpent, user.budget)
     }
 
     return res.status(201).json({

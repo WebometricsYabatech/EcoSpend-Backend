@@ -1,28 +1,28 @@
-import * as Brevo from '@getbrevo/brevo'
+import { BrevoClient } from '@getbrevo/brevo'
 
-const apiInstance = new Brevo.TransactionalEmailsApi()
-apiInstance.setApiKey(
-  Brevo.TransactionalEmailsApiApiKeys.apiKey,
-  process.env.BREVO_API_KEY
-)
+const brevo = new BrevoClient({
+  apiKey: process.env.BREVO_API_KEY
+})
 
 const sender = {
   name: process.env.BREVO_SENDER_NAME || 'EcoSpend',
   email: process.env.BREVO_SENDER_EMAIL
 }
 
-// ── Generic send function ──
 export const sendEmail = async ({ to, subject, htmlContent }) => {
   try {
-    const email = new Brevo.SendSmtpEmail()
-    email.sender = sender
-    email.to = [{ email: to }]
-    email.subject = subject
-    email.htmlContent = htmlContent
-    await apiInstance.sendTransacEmail(email)
-    console.log(`Email sent to ${to}`)
+    const result = await brevo.transactionalEmails.sendTransacEmail({
+      sender,
+      to: [{ email: to }],
+      subject,
+      htmlContent
+    })
+
+    console.log(`Email sent to ${to}`, result.messageId)
+    return result
   } catch (error) {
     console.error('Email send error:', error.message)
+    throw error
   }
 }
 
