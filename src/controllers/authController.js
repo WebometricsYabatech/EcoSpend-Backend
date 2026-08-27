@@ -20,7 +20,7 @@ export const register = async (req, res) => {
     })
 
     // Send welcome email
-    await sendWelcomeEmail(user.email, user.fullname)
+    await sendWelcomeEmail(user)
 
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
       expiresIn: '7d'

@@ -263,6 +263,9 @@ const expenses = await Promise.all(
     const isOverBudget = user.budget && totalSpent > user.budget
     const isNearBudget = user.budget && totalSpent >= user.budget * 0.8
 
+    console.log('USER OBJECT:', user)
+    console.log('USER EMAIL:', user?.email)
+
     if (isOverBudget || isNearBudget) {
       await sendBudgetAlertEmail(user, totalSpent, user.budget)
     }
