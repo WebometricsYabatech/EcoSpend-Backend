@@ -17,6 +17,8 @@ import profileRoutes from './routes/profile.js'
 import transactionRoutes from './routes/transactions.js'
 import userRoutes from './routes/user.js'
 import adminRoutes from './routes/admin.js'
+import passport from 'passport'
+import './config/passport.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -44,6 +46,7 @@ app.use(cors({
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
+app.use(passport.initialize())
 
 const swaggerHtml = `<!DOCTYPE html>
 <html lang="en">
