@@ -9,21 +9,30 @@ passport.use(new GoogleStrategy({
 },
 async (accessToken, refreshToken, profile, done) => {
   try {
-    const email = profile.emails[0].value
+    const email = profile.emails?.[0]?.value
     const fullname = profile.displayName
-    const avatarUrl = profile.photos[0]?.value || null
+    const avatarUrl = profile.photos?.[0]?.value || null
+
+    // Make sure Google actually gave us an email
+    if (!email) {
+      return done(new Error('Google account email not available'), null)
+    }
 
     // Check if user already exists
-    let user = await prisma.user.findUnique({ where: { email } })
+    let user = await prisma.user.findUnique({
+      where: { email }
+    })
 
     if (user) {
+
       // Update avatar if not set
       if (!user.avatarUrl && avatarUrl) {
         user = await prisma.user.update({
-          where: { email },
+          where: { id: user.id },
           data: { avatarUrl }
         })
       }
+
       return done(null, user)
     }
 
@@ -38,11 +47,21 @@ async (accessToken, refreshToken, profile, done) => {
     })
 
     // Send welcome email
-    const { sendWelcomeEmail } = await import('../utils/email.js')
-    await sendWelcomeEmail(user)
+    try {
+      const { sendWelcomeEmail } = await import('../utils/email.js')
+
+      await sendWelcomeEmail(user)
+
+      console.log('Google welcome email sent to:', user.email)
+
+    } catch (emailError) {
+      console.error('WELCOME EMAIL ERROR:', emailError.message)
+    }
 
     return done(null, user)
+
   } catch (error) {
+    console.error('GOOGLE PASSPORT ERROR:', error)
     return done(error, null)
   }
 }))
