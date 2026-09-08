@@ -17,7 +17,7 @@ import userRoutes from './routes/user.js'
 import adminRoutes from './routes/admin.js'
 
 import passport from 'passport'
-import './config/passport.js'
+import { initializePassport } from './config/passport.js'
 import session from 'express-session'
 
 const app = express()
@@ -46,6 +46,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
 }))
+initializePassport()
 app.use(passport.initialize())
 
 const swaggerHtml = `<!DOCTYPE html>
