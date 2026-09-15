@@ -6,7 +6,7 @@ export const initializePassport = () => {
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: process.env.GOOGLE_CALLBACK_URL
+    callbackURL: 'https://eco-spend-backend-eight.vercel.app/api/auth/google/callback'
   },
   async (accessToken, refreshToken, profile, done) => {
     try {
