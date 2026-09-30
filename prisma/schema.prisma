@@ -18,6 +18,8 @@ model User {
   currency  String?   @default("NGN")
   expenses  Expense[]
   categories Category[]
+  resetToken String?
+  resetTokenExpiry DateTime?
   createdAt DateTime  @default(now())
 }
 
