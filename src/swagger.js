@@ -394,7 +394,7 @@ const swaggerDocument = {
                   sustainabilityScore: { type: 'integer', example: 7 },
                   sustainabilityTip: { type: 'string', example: 'Consider choosing reusable produce bags.' },
                   store: { type: 'string', example: 'Fresh Mart' },
-                  receiptImage: { type: 'string', nullable: true }
+                  receiptUrl: { type: 'string', nullable: true }
                 }
               }
             }

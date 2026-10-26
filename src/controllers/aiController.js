@@ -3,6 +3,7 @@ import axios from 'axios'
 import FormData from 'form-data'
 import prisma from '../lib/prisma.js'
 import cloudinary from '../middleware/cloudinary.js'
+import { sendBudgetAlertEmail } from '../utils/email.js'
 
 const getGroqClient = () => {
   const apiKey = process.env.GROQ_API_KEY
@@ -22,14 +23,14 @@ export const scanReceipt = async (req, res) => {
     }
 
     // ── Upload receipt to Cloudinary for preview ──
-    let receiptImageUrl = null
+    let receiptUrl = null
     try {
       const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`
       const uploadResult = await cloudinary.uploader.upload(dataUri, {
         folder: 'ecospend/receipts',
         resource_type: 'auto'
       })
-      receiptImageUrl = uploadResult.secure_url
+      receiptUrl = uploadResult.secure_url
     } catch (uploadError) {
       console.error('Cloudinary upload error:', uploadError.message)
     }
@@ -52,7 +53,7 @@ export const scanReceipt = async (req, res) => {
     const ocrResponse = await axios.post(
       'https://api.ocr.space/parse/image',
       formData,
-      { headers: formData.getHeaders(), timeout: 20000 }
+      { headers: formData.getHeaders(), timeout: 55000 }
     )
 
     const parsedText = ocrResponse.data?.ParsedResults?.[0]?.ParsedText
@@ -69,13 +70,8 @@ export const scanReceipt = async (req, res) => {
       })
     }
 
-    // ── Send extracted text to Groq ──
-    const groqResponse = await groqClient.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        {
-          role: 'user',
-          content: `You are an expert receipt analyst for a sustainable spending tracker app.
+    // ── Send extracted text to Groq with fallback models ──
+    const prompt = `You are an expert receipt analyst for a sustainable spending tracker app.
 Below is raw text extracted from a receipt using OCR. Analyse it carefully.
 
 Your job is to:
@@ -119,39 +115,53 @@ Sustainability score rules — be honest and specific, do NOT default to 5:
 
 Raw receipt text:
 ${parsedText}`
-        }
-      ],
-      max_tokens: 2000
-    })
+
+    const models = ['openai/gpt-oss-20b', 'llama-3.1-8b-instant']
+    let groqResponse
+
+    for (const model of models) {
+      try {
+        groqResponse = await groqClient.chat.completions.create({
+          model,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 2000
+        })
+        console.log(`Used model: ${model}`)
+        break
+      } catch (err) {
+        console.error(`Model ${model} failed:`, err.message)
+        if (model === models[models.length - 1]) throw err
+      }
+    }
 
     const responseText = groqResponse.choices[0].message.content
 
-let cleanedText = responseText.replace(/```json|```/g, '').trim()
+    let cleanedText = responseText.replace(/```json|```/g, '').trim()
 
-// Extract JSON object if wrapped in other text
-const jsonMatch = cleanedText.match(/\{[\s\S]*\}/)
-if (!jsonMatch) {
-  return res.status(500).json({
-    message: 'AI returned invalid response, please try again'
-  })
-}
-cleanedText = jsonMatch[0]
+    // Extract JSON object if wrapped in other text
+    const jsonMatch = cleanedText.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      return res.status(500).json({
+        message: 'AI returned invalid response, please try again'
+      })
+    }
+    cleanedText = jsonMatch[0]
 
-let extractedData
-try {
-  extractedData = JSON.parse(cleanedText)
-} catch (parseError) {
-  console.error('JSON PARSE ERROR:', parseError.message)
-  console.error('RAW TEXT:', cleanedText)
-  return res.status(500).json({
-    message: 'AI returned invalid response, please try again',
-    error: parseError.message
-  })
-}
+    let extractedData
+    try {
+      extractedData = JSON.parse(cleanedText)
+    } catch (parseError) {
+      console.error('JSON PARSE ERROR:', parseError.message)
+      console.error('RAW TEXT:', cleanedText)
+      return res.status(500).json({
+        message: 'AI returned invalid response, please try again',
+        error: parseError.message
+      })
+    }
 
     return res.status(200).json({
       message: 'Receipt scanned successfully',
-      receiptImageUrl,
+      receiptUrl,
       extractedData
     })
 
@@ -162,7 +172,7 @@ try {
       error: error.message
     })
   }
-}
+}   
 
 // ================= CONFIRM & SAVE RECEIPT =================
 export const confirmReceipt = async (req, res) => {
@@ -225,7 +235,7 @@ const expenses = await Promise.all(
           : 5,
         sustainabilityTip: sustainabilityTip || 'Consider eco-friendly alternatives for a greener lifestyle.',
         storeName: req.body.store || null,
-        receiptUrl: req.body.receiptImage || null,
+        receiptUrl: req.body.receiptUrl || null,
         receiptTotal: index === 0
           ? Math.round(parseFloat(totalAmount) * 100) / 100
           : null,
@@ -251,6 +261,14 @@ const expenses = await Promise.all(
 
     const totalSpent = allExpenses.reduce((sum, e) => sum + e.amount, 0)
     const isOverBudget = user.budget && totalSpent > user.budget
+    const isNearBudget = user.budget && totalSpent >= user.budget * 0.8
+
+    console.log('USER OBJECT:', user)
+    console.log('USER EMAIL:', user?.email)
+
+    if (isOverBudget || isNearBudget) {
+      await sendBudgetAlertEmail(user, totalSpent, user.budget)
+    }
 
     return res.status(201).json({
       message: 'Receipt saved successfully',
@@ -258,7 +276,9 @@ const expenses = await Promise.all(
       sustainabilityTip,
       budgetAlert: isOverBudget
         ? `Warning: You have exceeded your monthly budget of ${user.budget}`
-        : null
+        : isNearBudget
+          ? `Notice: You are approaching your monthly budget of ${user.budget}`
+          : null
     })
 
   } catch (error) {
