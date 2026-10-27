@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Expense" ADD COLUMN     "subtotal" DOUBLE PRECISION,
+ADD COLUMN     "tax" DOUBLE PRECISION,
+ADD COLUMN     "currency" TEXT DEFAULT 'NGN',
+ADD COLUMN     "confidence" DOUBLE PRECISION;

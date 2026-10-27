@@ -103,7 +103,7 @@ export const getTransaction = async (req, res) => {
 export const updateTransaction = async (req, res) => {
   try {
     const { id } = req.params
-    const { amount, category, description, date } = req.body
+    const { amount, category, description, date, storeName, currency, subtotal, tax } = req.body
 
     const transaction = await prisma.expense.findUnique({ where: { id } })
 
@@ -118,10 +118,14 @@ export const updateTransaction = async (req, res) => {
     const updated = await prisma.expense.update({
       where: { id },
       data: {
-        ...(amount && { amount: parseFloat(amount) }),
+        ...(amount !== undefined && { amount: parseFloat(amount) }),
         ...(category && { category }),
         ...(description && { description }),
-        ...(date && { date: new Date(date) })
+        ...(date && { date: new Date(date) }),
+        ...(storeName !== undefined && { storeName }),
+        ...(currency && { currency }),
+        ...(subtotal !== undefined && { subtotal: parseFloat(subtotal) }),
+        ...(tax !== undefined && { tax: parseFloat(tax) })
       }
     })
 

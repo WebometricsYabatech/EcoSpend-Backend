@@ -3,7 +3,7 @@ import prisma from '../lib/prisma.js'
 
 // CREATE - Add expense (manual or from AI scan)
 export const addExpense = async (req, res) => {
-  const { amount, category, storeName, description, sustainabilityScore, receiptUrl, isManual, date } = req.body
+  const { amount, category, storeName, description, sustainabilityScore, receiptUrl, isManual, date, subtotal, tax, currency } = req.body
 
   try {
     const expense = await prisma.expense.create({
@@ -15,6 +15,9 @@ export const addExpense = async (req, res) => {
         description,
         sustainabilityScore: sustainabilityScore ? parseInt(sustainabilityScore) : null,
         receiptUrl,
+        subtotal: subtotal !== undefined ? parseFloat(subtotal) : null,
+        tax: tax !== undefined ? parseFloat(tax) : null,
+        currency: currency || undefined,
         isManual: isManual ?? true,
         date: date ? new Date(date) : new Date()
       }
@@ -58,7 +61,7 @@ export const getExpenseById = async (req, res) => {
 // UPDATE - Edit an expense
 export const updateExpense = async (req, res) => {
   const { id } = req.params
-  const { amount, category, storeName, description, sustainabilityScore, date } = req.body
+  const { amount, category, storeName, description, sustainabilityScore, date, subtotal, tax, currency } = req.body
 
   try {
     const existing = await prisma.expense.findUnique({ where: { id } })
@@ -75,6 +78,9 @@ export const updateExpense = async (req, res) => {
         storeName: storeName ?? existing.storeName,
         description: description ?? existing.description,
         sustainabilityScore: sustainabilityScore !== undefined ? parseInt(sustainabilityScore) : existing.sustainabilityScore,
+        subtotal: subtotal !== undefined ? parseFloat(subtotal) : existing.subtotal,
+        tax: tax !== undefined ? parseFloat(tax) : existing.tax,
+        currency: currency || existing.currency,
         date: date ? new Date(date) : existing.date
       }
     })
