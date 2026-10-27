@@ -27,38 +27,48 @@ export const getReceiptHistory = async (req, res) => {
     }
     if (currentGroup.length > 0) receiptGroups.push(currentGroup)
 
-    const receipts = receiptGroups.map((group) => {
-      const scoredItem = group.find(e => e.sustainabilityScore && e.sustainabilityScore > 0)
-      const tippedItem = group.find(e => e.sustainabilityTip)
-      const totalAmount = group[0].receiptTotal ||
-        Math.round(group.reduce((sum, e) => sum + e.amount, 0) * 100) / 100
+// Format each receipt group
+const receipts = receiptGroups.map((group) => {
+  // Receipt-level fields live on the item that carries receiptTotal.
+  const receiptItem = group.find(e => e.receiptTotal != null) || group[0]
+  const scoredItem = group.find(e => e.sustainabilityScore && e.sustainabilityScore > 0)
+  const tippedItem = group.find(e => e.sustainabilityTip)
 
-      return {
-        receiptId: `receipt-${group[0].createdAt.getTime()}`,
-        storeName: group[0].storeName || 'Unknown Store',
-        date: group[0].date,
-        scannedAt: group[0].createdAt,
-        category: group[0].category,
-        itemCount: group.length,
-        totalAmount,
-        receiptUrl: group[0].receiptUrl || null,
-        sustainabilityScore: scoredItem
-          ? Math.round((scoredItem.sustainabilityScore / 10) * 100)
-          : null,
-        sustainabilityTip: tippedItem ? tippedItem.sustainabilityTip : null,
-        items: group.map(e => ({
-          id: e.id,
-          name: e.description,
-          price: e.amount,
-          receiptUrl: e.receiptUrl || null,
-          sustainabilityScore: e.sustainabilityScore
-            ? Math.round((e.sustainabilityScore / 10) * 100)
-            : null,
-          sustainabilityTip: e.sustainabilityTip || null
-        }))
-      }
-    })
+  const totalAmount = receiptItem.receiptTotal != null
+    ? receiptItem.receiptTotal
+    : Math.round(group.reduce((sum, e) => sum + e.amount, 0) * 100) / 100
 
+  return {
+    receiptId: `receipt-${group[0].createdAt.getTime()}`,
+    storeName: group[0].storeName || 'Unknown Store',
+    date: group[0].date,
+    scannedAt: group[0].createdAt,
+    category: group[0].category,
+    itemCount: group.length,
+    totalAmount,
+    subtotal: receiptItem.subtotal ?? null,
+    tax: receiptItem.tax ?? null,
+    currency: receiptItem.currency || group[0].currency || 'NGN',
+    confidence: receiptItem.confidence ?? null,
+    receiptUrl: group[0].receiptUrl || null,
+    sustainabilityScore: scoredItem
+      ? Math.round((scoredItem.sustainabilityScore / 10) * 100)
+      : null,
+    sustainabilityTip: tippedItem ? tippedItem.sustainabilityTip : null,
+    items: group.map(e => ({
+      id: e.id,
+      name: e.description,
+      price: e.amount,
+      receiptUrl: e.receiptUrl || null,
+      sustainabilityScore: e.sustainabilityScore
+        ? Math.round((e.sustainabilityScore / 10) * 100)
+        : null,
+      sustainabilityTip: e.sustainabilityTip || null
+    }))
+  }
+})
+
+    // Pagination
     const total = receipts.length
     const skip = (parseInt(page) - 1) * parseInt(limit)
     const paginated = receipts.slice(skip, skip + parseInt(limit))

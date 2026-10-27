@@ -15,6 +15,14 @@ const getGroqClient = () => {
   return new Groq({ apiKey })
 }
 
+const round2 = (value) => Math.round(value * 100) / 100
+
+const toNumber = (value) => {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = parseFloat(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 // ================= SCAN RECEIPT =================
 export const scanReceipt = async (req, res) => {
   try {
@@ -79,10 +87,20 @@ Your job is to:
 2. Determine the correct spending category based on the store type and items
 3. Calculate an honest sustainability score based on what was actually purchased
 
+Financial field rules:
+- subtotal is the pre-tax total; tax is the total tax charged; totalAmount is the final total paid.
+- Use null (not 0) for any financial field that is not visible on the receipt.
+- currency is the receipt's 3-letter ISO currency code (e.g. NGN, USD, GBP); use null only when truly unknown.
+- confidence is a number from 0 to 1 estimating how certain you are about the extracted merchant, date, subtotal, tax, total and currency (1 = very confident, 0 = guessing).
+
 Return ONLY valid JSON with no extra text, no markdown, no backticks:
 {
-  "storeName": "exact store name from receipt or Unknown if not visible",
-  "date": "date in YYYY-MM-DD format or todays date if not visible",
+  "storeName": "exact store name from receipt, or null if not visible",
+  "date": "date printed on the receipt in YYYY-MM-DD format, or null if not visible",
+  "currency": null,
+  "subtotal": null,
+  "tax": null,
+  "totalAmount": 0.00,
   "items": [
     {
       "name": "exact item name as written on receipt",
@@ -90,7 +108,7 @@ Return ONLY valid JSON with no extra text, no markdown, no backticks:
     }
   ],
   "category": "choose the MOST ACCURATE category from this list based on what was purchased: Groceries, Food & Dining, Transport, Utilities, Clothing, Electronics, Health, Entertainment, Other",
-  "totalAmount": 0.00,
+  "confidence": 0.0,
   "sustainabilityScore": 0,
   "sustainabilityTip": "one specific actionable tip based on what was actually purchased"
 }
@@ -177,27 +195,61 @@ ${parsedText}`
 // ================= CONFIRM & SAVE RECEIPT =================
 export const confirmReceipt = async (req, res) => {
   try {
-    const { items, category, totalAmount, sustainabilityScore, sustainabilityTip } = req.body
-
-    // Debug log — check what score is arriving from frontend
-    console.log('RECEIVED SCORE:', sustainabilityScore, typeof sustainabilityScore)
+    const {
+      items, category, totalAmount, total, subtotal, tax, currency,
+      sustainabilityScore, sustainabilityTip, confidence,
+      storeName, store, date, receiptDate,
+      receiptImage, receiptImageUrl, receiptUrl
+    } = req.body
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'No items provided' })
     }
 
-    // Prevent duplicate submissions within 10 seconds
-    const tenSecondsAgo = new Date(Date.now() - 10000)
-    const recentExpenses = await prisma.expense.count({
-      where: {
-        userId: req.user.id,
-        isManual: false,
-        createdAt: { gte: tenSecondsAgo }
-      }
-    })
+    // Canonical field handling — accept legacy aliases until the frontend contract is aligned.
+    const merchant = storeName || store || null
+    const receiptTotal = toNumber(totalAmount ?? total)
+    const sub = toNumber(subtotal)
+    const taxAmount = toNumber(tax)
+    const currencyCode = currency || 'NGN'
+    const confidenceValue = toNumber(confidence)
+    const receiptDateValue = receiptDate || date || null
+    const imageUrl = receiptImage || receiptImageUrl || receiptUrl || null
 
-    if (recentExpenses > 0) {
-      return res.status(409).json({ message: 'Receipt already saved. Please wait before submitting again.' })
+    // FR-01: validate arithmetic when subtotal, tax and total are all present.
+    if (sub !== null && taxAmount !== null && receiptTotal !== null) {
+      const computedTotal = round2(sub + taxAmount)
+      if (Math.abs(computedTotal - round2(receiptTotal)) >= 0.01) {
+        return res.status(400).json({
+          message: 'Receipt totals do not add up. Please correct subtotal, tax or total before saving.',
+          validation: {
+            arithmeticMismatch: true,
+            subtotal: sub,
+            tax: taxAmount,
+            total: receiptTotal,
+            computedTotal
+          }
+        })
+      }
+    }
+
+    // FR-06: detect likely duplicates (merchant + total + receipt date) and require explicit override.
+    const duplicateWhere = { userId: req.user.id, isManual: false }
+    if (merchant) duplicateWhere.storeName = merchant
+    if (receiptTotal !== null) duplicateWhere.receiptTotal = receiptTotal
+    if (receiptDateValue) duplicateWhere.date = new Date(receiptDateValue)
+
+    const hasDuplicateSignal = merchant || receiptTotal !== null || receiptDateValue
+    const duplicate = hasDuplicateSignal
+      ? await prisma.expense.findFirst({ where: duplicateWhere })
+      : null
+
+    if (duplicate && req.body.force !== true) {
+      return res.status(409).json({
+        message: 'This receipt appears to be a duplicate.',
+        duplicate: true,
+        duplicateReceiptId: duplicate.id
+      })
     }
 
     // ── Auto-save custom category if not in default list ──
@@ -221,33 +273,36 @@ export const confirmReceipt = async (req, res) => {
       }
     }
 
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } })
+    const resolvedCurrency = currencyCode || user?.currency || 'NGN'
+    const resolvedScore = sustainabilityScore && parseInt(sustainabilityScore) > 0
+      ? parseInt(sustainabilityScore)
+      : null
+
     // ── Save all items as expenses ──
-const expenses = await Promise.all(
-  items.map((item, index) =>
-    prisma.expense.create({
-      data: {
-        userId: req.user.id,
-        amount: Math.round(parseFloat(item.price) * 100) / 100,
-        category: category || 'Other',
-        description: item.name,
-        sustainabilityScore: sustainabilityScore && parseInt(sustainabilityScore) > 0
-          ? parseInt(sustainabilityScore)
-          : 5,
-        sustainabilityTip: sustainabilityTip || 'Consider eco-friendly alternatives for a greener lifestyle.',
-        storeName: req.body.store || null,
-        receiptUrl: req.body.receiptUrl || null,
-        receiptTotal: index === 0
-          ? Math.round(parseFloat(totalAmount) * 100) / 100
-          : null,
-        isManual: false,
-        date: new Date()
-      }
-    })
-  )
-)
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id }
-    })
+    const expenses = await Promise.all(
+      items.map((item, index) =>
+        prisma.expense.create({
+          data: {
+            userId: req.user.id,
+            amount: round2(toNumber(item.price) ?? 0),
+            category: category || 'Other',
+            description: item.name,
+            sustainabilityScore: resolvedScore,
+            sustainabilityTip: sustainabilityTip || null,
+            storeName: merchant,
+            receiptUrl: imageUrl,
+            receiptTotal: index === 0 ? receiptTotal : null,
+            subtotal: index === 0 ? sub : null,
+            tax: index === 0 ? taxAmount : null,
+            currency: resolvedCurrency,
+            confidence: index === 0 ? confidenceValue : null,
+            isManual: false,
+            date: receiptDateValue ? new Date(receiptDateValue) : new Date()
+          }
+        })
+      )
+    )
 
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)

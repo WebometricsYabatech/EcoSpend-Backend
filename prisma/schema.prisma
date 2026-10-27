@@ -35,6 +35,10 @@ model Expense {
   sustainabilityTip   String?
   receiptUrl          String?
   receiptTotal        Float?
+  subtotal            Float?
+  tax                 Float?
+  currency            String?  @default("NGN")
+  confidence          Float?
   isManual            Boolean  @default(false)
   date                DateTime @default(now())
   createdAt           DateTime @default(now())
