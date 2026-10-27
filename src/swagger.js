@@ -91,6 +91,10 @@ const swaggerDocument = {
           sustainabilityTip: { type: 'string', nullable: true },
           receiptUrl: { type: 'string', nullable: true },
           receiptTotal: { type: 'number', nullable: true },
+          subtotal: { type: 'number', nullable: true },
+          tax: { type: 'number', nullable: true },
+          currency: { type: 'string', nullable: true },
+          confidence: { type: 'number', nullable: true },
           isManual: { type: 'boolean' },
           date: { type: 'string', format: 'date-time' },
           createdAt: { type: 'string', format: 'date-time' }
@@ -106,6 +110,9 @@ const swaggerDocument = {
           description: { type: 'string', example: 'Fresh vegetables and rice' },
           sustainabilityScore: { type: 'integer', example: 8 },
           receiptUrl: { type: 'string', nullable: true },
+          subtotal: { type: 'number', nullable: true, example: 40.0 },
+          tax: { type: 'number', nullable: true, example: 2.75 },
+          currency: { type: 'string', example: 'NGN' },
           isManual: { type: 'boolean', example: true },
           date: { type: 'string', format: 'date-time', example: '2026-08-13T12:00:00.000Z' }
         }
@@ -117,6 +124,63 @@ const swaggerDocument = {
           name: { type: 'string' },
           userId: { type: 'string' },
           createdAt: { type: 'string', format: 'date-time' }
+        }
+      },
+      ReceiptItem: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          name: { type: 'string' },
+          price: { type: 'number' },
+          receiptUrl: { type: 'string', nullable: true },
+          sustainabilityScore: { type: 'integer', nullable: true },
+          sustainabilityTip: { type: 'string', nullable: true }
+        }
+      },
+      Receipt: {
+        type: 'object',
+        properties: {
+          receiptId: { type: 'string' },
+          storeName: { type: 'string', nullable: true },
+          date: { type: 'string', format: 'date-time' },
+          scannedAt: { type: 'string', format: 'date-time' },
+          category: { type: 'string' },
+          itemCount: { type: 'integer' },
+          totalAmount: { type: 'number', nullable: true },
+          subtotal: { type: 'number', nullable: true },
+          tax: { type: 'number', nullable: true },
+          currency: { type: 'string', nullable: true },
+          confidence: { type: 'number', nullable: true },
+          receiptUrl: { type: 'string', nullable: true },
+          sustainabilityScore: { type: 'integer', nullable: true },
+          sustainabilityTip: { type: 'string', nullable: true },
+          items: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/ReceiptItem' }
+          }
+        }
+      },
+      ScanReceiptResponse: {
+        type: 'object',
+        properties: {
+          message: { type: 'string' },
+          receiptUrl: { type: 'string', nullable: true },
+          extractedData: {
+            type: 'object',
+            properties: {
+              storeName: { type: 'string', nullable: true },
+              date: { type: 'string', nullable: true },
+              currency: { type: 'string', nullable: true },
+              subtotal: { type: 'number', nullable: true },
+              tax: { type: 'number', nullable: true },
+              totalAmount: { type: 'number', nullable: true },
+              items: { type: 'array', items: { type: 'object' } },
+              category: { type: 'string' },
+              confidence: { type: 'number', nullable: true },
+              sustainabilityScore: { type: 'integer', nullable: true },
+              sustainabilityTip: { type: 'string', nullable: true }
+            }
+          }
         }
       },
       UpdateProfileRequest: {
@@ -361,7 +425,12 @@ const swaggerDocument = {
           }
         },
         responses: {
-          '200': { description: 'Receipt scanned successfully' },
+          '200': {
+            description: 'Receipt scanned successfully',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/ScanReceiptResponse' } }
+            }
+          },
           '400': { description: 'No receipt uploaded or OCR failed' },
           '500': { description: 'Failed to scan receipt' }
         }
@@ -378,6 +447,7 @@ const swaggerDocument = {
             'application/json': {
               schema: {
                 type: 'object',
+                required: ['items'],
                 properties: {
                   items: {
                     type: 'array',
@@ -390,11 +460,22 @@ const swaggerDocument = {
                     }
                   },
                   category: { type: 'string', example: 'Groceries' },
-                  totalAmount: { type: 'number', example: 42.75 },
-                  sustainabilityScore: { type: 'integer', example: 7 },
-                  sustainabilityTip: { type: 'string', example: 'Consider choosing reusable produce bags.' },
-                  store: { type: 'string', example: 'Fresh Mart' },
-                  receiptUrl: { type: 'string', nullable: true }
+                  storeName: { type: 'string', nullable: true, example: 'Fresh Mart', description: 'Canonical merchant name (legacy alias: store)' },
+                  store: { type: 'string', nullable: true, description: 'Legacy alias for storeName' },
+                  date: { type: 'string', format: 'date', nullable: true, example: '2026-10-27', description: 'Printed receipt date (legacy alias: receiptDate)' },
+                  receiptDate: { type: 'string', nullable: true, description: 'Legacy alias for date' },
+                  totalAmount: { type: 'number', nullable: true, example: 42.75, description: 'Receipt grand total (legacy alias: total)' },
+                  total: { type: 'number', nullable: true, description: 'Legacy alias for totalAmount' },
+                  subtotal: { type: 'number', nullable: true, example: 40.0 },
+                  tax: { type: 'number', nullable: true, example: 2.75 },
+                  currency: { type: 'string', nullable: true, example: 'NGN' },
+                  confidence: { type: 'number', nullable: true, example: 0.9, description: 'Extraction confidence from 0.0 to 1.0' },
+                  sustainabilityScore: { type: 'integer', nullable: true, example: 7 },
+                  sustainabilityTip: { type: 'string', nullable: true, example: 'Consider choosing reusable produce bags.' },
+                  receiptUrl: { type: 'string', nullable: true },
+                  receiptImage: { type: 'string', nullable: true, description: 'Legacy alias for receiptUrl' },
+                  receiptImageUrl: { type: 'string', nullable: true, description: 'Legacy alias for receiptUrl' },
+                  force: { type: 'boolean', example: false, description: 'Set to true to save despite duplicate detection' }
                 }
               }
             }
@@ -402,7 +483,8 @@ const swaggerDocument = {
         },
         responses: {
           '201': { description: 'Receipt saved successfully' },
-          '409': { description: 'Receipt already saved; wait a moment and retry' },
+          '400': { description: 'Arithmetic mismatch: subtotal + tax does not equal total' },
+          '409': { description: 'Likely duplicate receipt detected; send force: true to override' },
           '500': { description: 'Failed to save receipt' }
         }
       }
@@ -417,7 +499,23 @@ const swaggerDocument = {
           { in: 'query', name: 'limit', schema: { type: 'integer', default: 10 } }
         ],
         responses: {
-          '200': { description: 'Receipt history retrieved' },
+          '200': {
+            description: 'Receipt history retrieved',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    receipts: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/Receipt' }
+                    },
+                    pagination: { type: 'object' }
+                  }
+                }
+              }
+            }
+          },
           '401': { description: 'Unauthorized' }
         }
       }
@@ -658,7 +756,11 @@ const swaggerDocument = {
                   amount: { type: 'number' },
                   category: { type: 'string' },
                   description: { type: 'string' },
-                  date: { type: 'string', format: 'date-time' }
+                  date: { type: 'string', format: 'date-time' },
+                  storeName: { type: 'string', nullable: true },
+                  currency: { type: 'string', nullable: true },
+                  subtotal: { type: 'number', nullable: true },
+                  tax: { type: 'number', nullable: true }
                 }
               }
             }
